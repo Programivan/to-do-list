@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -16,7 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 
-import { Todo, TabType } from './src/types/todo';
+import { Todo, TabType, TodoFormData } from './src/types/todo';
 import { COLORS } from './src/constants/theme';
 import {
   fetchTodos,
@@ -63,7 +63,7 @@ function MainScreen() {
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  // Date toggle (mock date 4th March 2018 vs today)
+  // Date toggle (mock date vs today)
   const [useTodayDate, setUseTodayDate] = useState(false);
   const currentDateText = useTodayDate ? getFormattedDate() : '4th March 2018';
 
@@ -144,7 +144,13 @@ function MainScreen() {
   const handleToggle = useCallback(async (id: number) => {
     setTodos((prev) =>
       prev.map((item) =>
-        item.id === id ? { ...item, completed: !item.completed } : item
+        item.id === id
+          ? {
+              ...item,
+              completed: !item.completed,
+              status: !item.completed ? 'done' : 'to-do',
+            }
+          : item
       )
     );
     const target = todos.find((t) => t.id === id);
@@ -158,19 +164,23 @@ function MainScreen() {
     await deleteTodoApi(id);
   }, []);
 
-  const handleAddTodo = useCallback(async (text: string, time: string) => {
+  // React Hook Form submission handler
+  const handleAddTodo = useCallback(async (formData: TodoFormData) => {
     const tempId = Date.now();
     const newTodo: Todo = {
       id: tempId,
-      todo: text,
+      todo: formData.title,
       completed: false,
+      status: 'to-do',
+      date: formData.date,
+      priority: formData.priority,
       userId: 1,
-      time: time,
+      time: '12 pm',
     };
     setTodos((prev) => [newTodo, ...prev]);
 
     try {
-      const serverTodo = await addTodoApi(text, time);
+      const serverTodo = await addTodoApi(formData);
       setTodos((prev) =>
         prev.map((t) => (t.id === tempId ? { ...t, id: serverTodo.id } : t))
       );
@@ -342,7 +352,7 @@ function MainScreen() {
             style={{ marginRight: 6 }}
           />
           <Text style={[styles.chipText, activeTab === 'pending' && styles.chipTextActive]}>
-            В процесі
+            to-do
           </Text>
           <View style={[styles.chipBadge, activeTab === 'pending' && styles.chipBadgeActive]}>
             <Text style={[styles.chipBadgeText, activeTab === 'pending' && styles.chipBadgeTextActive]}>
@@ -363,7 +373,7 @@ function MainScreen() {
             style={{ marginRight: 6 }}
           />
           <Text style={[styles.chipText, activeTab === 'completed' && styles.chipTextActive]}>
-            Виконані
+            done
           </Text>
           <View style={[styles.chipBadge, activeTab === 'completed' && styles.chipBadgeActive]}>
             <Text style={[styles.chipBadgeText, activeTab === 'completed' && styles.chipBadgeTextActive]}>
@@ -421,7 +431,7 @@ function MainScreen() {
                 <Text style={styles.emptySubtitle}>
                   {searchQuery
                     ? 'За запитом нічого не знайдено'
-                    : 'Створіть нове завдання або завантажте готові з DummyJSON API'}
+                    : 'Створіть нове завдання через форму або завантажте з DummyJSON'}
                 </Text>
 
                 <View style={styles.emptyBtnGroup}>
@@ -431,7 +441,7 @@ function MainScreen() {
                     activeOpacity={0.8}
                   >
                     <Feather name="plus-circle" size={18} color="#002966" style={{ marginRight: 8 }} />
-                    <Text style={styles.emptyPrimaryBtnText}>Створити завдання</Text>
+                    <Text style={styles.emptyPrimaryBtnText}>Створити завдання (Форма)</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -462,7 +472,7 @@ function MainScreen() {
         </TouchableOpacity>
       </Animated.View>
 
-      {/* Material 3 Expressive Add Modal */}
+      {/* Material 3 Expressive Add Modal with React Hook Form */}
       <AddTodoModal
         visible={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}

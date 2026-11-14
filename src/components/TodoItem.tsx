@@ -8,7 +8,7 @@ import {
   Animated,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { Todo } from '../types/todo';
+import { Todo, Priority } from '../types/todo';
 import { COLORS } from '../constants/theme';
 
 interface TodoItemProps {
@@ -17,9 +17,40 @@ interface TodoItemProps {
   onDelete: (id: number) => void;
 }
 
+function getPriorityBadgeConfig(priority: Priority = 'medium') {
+  switch (priority) {
+    case 'high':
+      return {
+        label: 'High',
+        bg: COLORS.priorityHighBg,
+        border: COLORS.priorityHighBorder,
+        text: COLORS.priorityHighText,
+        icon: 'alert-circle',
+      };
+    case 'medium':
+      return {
+        label: 'Med',
+        bg: COLORS.priorityMedBg,
+        border: COLORS.priorityMedBorder,
+        text: COLORS.priorityMedText,
+        icon: 'clock',
+      };
+    case 'low':
+      return {
+        label: 'Low',
+        bg: COLORS.priorityLowBg,
+        border: COLORS.priorityLowBorder,
+        text: COLORS.priorityLowText,
+        icon: 'arrow-down',
+      };
+  }
+}
+
 export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, onDelete }) => {
   const [cardScale] = useState(() => new Animated.Value(1));
   const [checkScale] = useState(() => new Animated.Value(todo.completed ? 1 : 0.85));
+
+  const priorityConfig = getPriorityBadgeConfig(todo.priority);
 
   const handlePressIn = () => {
     Animated.spring(cardScale, {
@@ -40,7 +71,6 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
   };
 
   const handleToggleWithAnimation = () => {
-    // Pop animation on the checkbox
     Animated.sequence([
       Animated.timing(checkScale, {
         toValue: 1.3,
@@ -82,8 +112,8 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
           todo.completed && styles.cardCompleted,
         ]}
       >
-        <View style={styles.leftSection}>
-          {/* Animated Expressive Checkbox Pill */}
+        <View style={styles.topRow}>
+          {/* Checkbox & Title */}
           <Animated.View
             style={[
               styles.checkboxContainer,
@@ -98,7 +128,6 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
             )}
           </Animated.View>
 
-          {/* Task title */}
           <Text
             style={[
               styles.todoText,
@@ -108,26 +137,6 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
           >
             {todo.todo}
           </Text>
-        </View>
-
-        <View style={styles.rightSection}>
-          {todo.time ? (
-            <View
-              style={[
-                styles.timeBadge,
-                todo.completed && styles.timeBadgeCompleted,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.timeText,
-                  todo.completed && styles.timeTextCompleted,
-                ]}
-              >
-                {todo.time}
-              </Text>
-            </View>
-          ) : null}
 
           <TouchableOpacity
             onPress={() => onDelete(todo.id)}
@@ -136,6 +145,44 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
           >
             <Feather name="trash-2" size={16} color={COLORS.textMuted} />
           </TouchableOpacity>
+        </View>
+
+        {/* Bottom meta row: Priority, Date, Status */}
+        <View style={styles.metaRow}>
+          <View style={styles.metaLeft}>
+            {/* Priority Badge */}
+            <View
+              style={[
+                styles.badge,
+                { backgroundColor: priorityConfig.bg, borderColor: priorityConfig.border },
+              ]}
+            >
+              <Feather
+                name={priorityConfig.icon as any}
+                size={11}
+                color={priorityConfig.text}
+                style={{ marginRight: 4 }}
+              />
+              <Text style={[styles.badgeText, { color: priorityConfig.text }]}>
+                {priorityConfig.label}
+              </Text>
+            </View>
+
+            {/* Date Badge */}
+            {todo.date ? (
+              <View style={styles.dateBadge}>
+                <Feather name="calendar" size={11} color={COLORS.primary} style={{ marginRight: 4 }} />
+                <Text style={styles.dateBadgeText}>{todo.date}</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Status pill: done / to-do */}
+          <View style={[styles.statusPill, todo.completed ? styles.statusPillDone : styles.statusPillTodo]}>
+            <Text style={[styles.statusPillText, todo.completed ? styles.statusTextDone : styles.statusTextTodo]}>
+              {todo.status || (todo.completed ? 'done' : 'to-do')}
+            </Text>
+          </View>
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -148,13 +195,10 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.cardDark,
     borderRadius: 22,
-    paddingVertical: 15,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     marginHorizontal: 16,
     marginVertical: 5,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     borderWidth: 1.5,
     borderColor: COLORS.cardBorder,
   },
@@ -162,11 +206,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.cardCompleted,
     borderColor: COLORS.cardBorderCompleted,
   },
-  leftSection: {
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    marginRight: 10,
+    marginBottom: 10,
   },
   checkboxContainer: {
     width: 26,
@@ -203,35 +246,69 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontWeight: '500',
   },
-  rightSection: {
+  deleteButton: {
+    padding: 6,
+    marginLeft: 8,
+  },
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingLeft: 38,
   },
-  timeBadge: {
+  metaLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  dateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: COLORS.cardDarkElevated,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    marginRight: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  timeBadgeCompleted: {
-    backgroundColor: '#121419',
-    borderColor: '#1C1F28',
+  dateBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textSubtitle,
   },
-  timeText: {
-    fontSize: 12,
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  statusPillTodo: {
+    backgroundColor: '#19263D',
+  },
+  statusPillDone: {
+    backgroundColor: '#0E3B27',
+  },
+  statusPillText: {
+    fontSize: 11,
     fontWeight: '800',
+    textTransform: 'uppercase',
+  },
+  statusTextTodo: {
     color: COLORS.primary,
-    letterSpacing: -0.3,
   },
-  timeTextCompleted: {
-    color: COLORS.textMuted,
-  },
-  deleteButton: {
-    padding: 6,
-    borderRadius: 12,
-    opacity: 0.7,
+  statusTextDone: {
+    color: COLORS.success,
   },
 });

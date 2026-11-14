@@ -1,7 +1,9 @@
-import { Todo, TodosResponse } from '../types/todo';
+import { Todo, TodosResponse, TodoFormData, Priority } from '../types/todo';
 import { getTaskTime } from '../constants/theme';
 
 const BASE_URL = 'https://dummyjson.com/todos';
+
+const PRIORITIES: Priority[] = ['high', 'medium', 'low', 'medium', 'low'];
 
 export async function fetchTodos(limit: number = 30, skip: number = 0): Promise<{ todos: Todo[]; total: number }> {
   try {
@@ -11,10 +13,15 @@ export async function fetchTodos(limit: number = 30, skip: number = 0): Promise<
     }
     const data: TodosResponse = await response.json();
     
-    // Assign mock times matching the visual layout if not present
-    const enrichedTodos = data.todos.map((item, index) => ({
-      ...item,
-      time: item.time || getTaskTime(skip + index, item.id),
+    const enrichedTodos: Todo[] = data.todos.map((item, index) => ({
+      id: item.id,
+      todo: item.todo,
+      completed: item.completed,
+      status: item.completed ? 'done' : 'to-do',
+      priority: PRIORITIES[(item.id + index) % PRIORITIES.length],
+      date: 'Today',
+      userId: item.userId,
+      time: getTaskTime(skip + index, item.id),
     }));
 
     return { todos: enrichedTodos, total: data.total };
@@ -24,13 +31,13 @@ export async function fetchTodos(limit: number = 30, skip: number = 0): Promise<
   }
 }
 
-export async function addTodoApi(todoText: string, time?: string): Promise<Todo> {
+export async function addTodoApi(formData: TodoFormData): Promise<Todo> {
   try {
     const response = await fetch(`${BASE_URL}/add`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        todo: todoText,
+        todo: formData.title,
         completed: false,
         userId: 1,
       }),
@@ -40,20 +47,28 @@ export async function addTodoApi(todoText: string, time?: string): Promise<Todo>
       throw new Error(`Failed to add todo: ${response.status}`);
     }
 
-    const created: Todo = await response.json();
+    const created = await response.json();
     return {
-      ...created,
-      time: time || '12 pm',
+      id: created.id,
+      todo: formData.title,
+      completed: false,
+      status: 'to-do',
+      date: formData.date,
+      priority: formData.priority,
+      userId: 1,
+      time: '12 pm',
     };
   } catch (error) {
     console.error('Error adding todo to server, using local fallback:', error);
-    // Local fallback in case network has issues
     return {
       id: Date.now(),
-      todo: todoText,
+      todo: formData.title,
       completed: false,
+      status: 'to-do',
+      date: formData.date,
+      priority: formData.priority,
       userId: 1,
-      time: time || '12 pm',
+      time: '12 pm',
     };
   }
 }

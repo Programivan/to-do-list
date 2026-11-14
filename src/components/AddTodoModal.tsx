@@ -11,35 +11,99 @@ import {
   Animated,
   TextInput,
 } from 'react-native';
+import { useForm, Controller } from 'react-hook-form';
 import { Feather } from '@expo/vector-icons';
+import { Priority, TodoFormData } from '../types/todo';
 import { COLORS } from '../constants/theme';
 
 interface AddTodoModalProps {
   visible: boolean;
   onClose: () => void;
-  onAdd: (todoText: string, time: string) => void;
+  onAdd: (data: TodoFormData) => void;
 }
 
-const QUICK_TIMES = ['12 pm', '1 pm', '3 pm', '4 pm', '5 pm', '6 pm', '9 am', '10 am', '11 am'];
+function getTodayString(): string {
+  const d = new Date();
+  const day = d.getDate();
+  const months = [
+    'Січ', 'Лют', 'Бер', 'Кві', 'Тра', 'Чер',
+    'Лип', 'Сер', 'Вер', 'Жов', 'Лис', 'Гру',
+  ];
+  return `${day} ${months[d.getMonth()]}`;
+}
+
+function getTomorrowString(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const day = d.getDate();
+  const months = [
+    'Січ', 'Лют', 'Бер', 'Кві', 'Тра', 'Чер',
+    'Лип', 'Сер', 'Вер', 'Жов', 'Лис', 'Гру',
+  ];
+  return `${day} ${months[d.getMonth()]}`;
+}
+
+const PRIORITIES: { key: Priority; label: string; icon: string; bg: string; border: string; text: string }[] = [
+  {
+    key: 'high',
+    label: 'Високий (High)',
+    icon: 'alert-triangle',
+    bg: COLORS.priorityHighBg,
+    border: COLORS.priorityHighBorder,
+    text: COLORS.priorityHighText,
+  },
+  {
+    key: 'medium',
+    label: 'Середній (Med)',
+    icon: 'clock',
+    bg: COLORS.priorityMedBg,
+    border: COLORS.priorityMedBorder,
+    text: COLORS.priorityMedText,
+  },
+  {
+    key: 'low',
+    label: 'Низький (Low)',
+    icon: 'arrow-down',
+    bg: COLORS.priorityLowBg,
+    border: COLORS.priorityLowBorder,
+    text: COLORS.priorityLowText,
+  },
+];
 
 export const AddTodoModal: React.FC<AddTodoModalProps> = ({
   visible,
   onClose,
   onAdd,
 }) => {
-  const [todoText, setTodoText] = useState('');
-  const [selectedTime, setSelectedTime] = useState('12 pm');
-  const [customTime, setCustomTime] = useState('');
-
-  const [slideAnim] = useState(() => new Animated.Value(300));
+  const [slideAnim] = useState(() => new Animated.Value(400));
   const [fadeAnim] = useState(() => new Animated.Value(0));
+
+  // React Hook Form initialization
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<TodoFormData>({
+    defaultValues: {
+      title: '',
+      date: getTodayString(),
+      priority: 'medium',
+    },
+    mode: 'onChange',
+  });
 
   useEffect(() => {
     if (visible) {
+      reset({
+        title: '',
+        date: getTodayString(),
+        priority: 'medium',
+      });
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 220,
+          duration: 200,
           useNativeDriver: true,
         }),
         Animated.spring(slideAnim, {
@@ -50,17 +114,13 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
         }),
       ]).start();
     } else {
-      slideAnim.setValue(300);
+      slideAnim.setValue(400);
       fadeAnim.setValue(0);
     }
-  }, [visible, slideAnim, fadeAnim]);
+  }, [visible, slideAnim, fadeAnim, reset]);
 
-  const handleAdd = () => {
-    if (!todoText.trim()) return;
-    const finalTime = customTime.trim() || selectedTime;
-    onAdd(todoText.trim(), finalTime);
-    setTodoText('');
-    setCustomTime('');
+  const onSubmit = (data: TodoFormData) => {
+    onAdd(data);
     onClose();
   };
 
@@ -89,104 +149,212 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
             { transform: [{ translateY: slideAnim }] },
           ]}
         >
-          {/* M3 Expressive Handle Bar */}
+          {/* Drag Handle */}
           <View style={styles.dragHandle} />
 
           {/* Header */}
           <View style={styles.header}>
             <View>
-              <Text style={styles.title}>Створити завдання</Text>
-              <Text style={styles.subtitle}>Material 3 Expressive</Text>
+              <Text style={styles.title}>Нове завдання</Text>
+              <Text style={styles.subtitle}>React Hook Form • Material 3</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <Feather name="x" size={20} color={COLORS.textMuted} />
             </TouchableOpacity>
           </View>
 
-          {/* Input field */}
-          <View style={styles.inputContainer}>
-            <Feather name="edit-3" size={18} color={COLORS.primary} style={styles.inputIcon} />
-            <TextInput
-              style={styles.textInput}
-              placeholder="Що потрібно зробити?"
-              placeholderTextColor={COLORS.textMuted}
-              value={todoText}
-              onChangeText={setTodoText}
-              autoFocus
-            />
-          </View>
-
-          {/* Time Picker Chips */}
-          <Text style={styles.sectionLabel}>Час виконання</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.chipRow}
-            contentContainerStyle={styles.chipRowContent}
-          >
-            {QUICK_TIMES.map((time) => {
-              const isSelected = selectedTime === time && !customTime;
-              return (
-                <TouchableOpacity
-                  key={time}
-                  activeOpacity={0.7}
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* 1. ПОЛЕ: НАЗВА */}
+            <Text style={styles.label}>Назва завдання *</Text>
+            <Controller
+              control={control}
+              name="title"
+              rules={{
+                required: 'Назва завдання є обовʼязковою',
+                minLength: {
+                  value: 3,
+                  message: 'Мінімальна довжина — 3 символи',
+                },
+              }}
+              render={({ field: { onChange, onBlur, value } }) => (
+                <View
                   style={[
-                    styles.timeChip,
-                    isSelected && styles.timeChipSelected,
+                    styles.inputContainer,
+                    errors.title && styles.inputErrorBorder,
                   ]}
-                  onPress={() => {
-                    setSelectedTime(time);
-                    setCustomTime('');
-                  }}
                 >
-                  <Text
+                  <Feather
+                    name="edit-3"
+                    size={18}
+                    color={errors.title ? COLORS.danger : COLORS.primary}
+                    style={styles.inputIcon}
+                  />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Наприклад: Підготувати звіт"
+                    placeholderTextColor={COLORS.textMuted}
+                    value={value}
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                    autoFocus
+                  />
+                </View>
+              )}
+            />
+            {errors.title && (
+              <View style={styles.errorRow}>
+                <Feather name="alert-circle" size={13} color={COLORS.danger} />
+                <Text style={styles.errorText}>{errors.title.message}</Text>
+              </View>
+            )}
+
+            {/* 2. ПОЛЕ: ДАТА */}
+            <Text style={[styles.label, { marginTop: 14 }]}>Дата виконання *</Text>
+            <Controller
+              control={control}
+              name="date"
+              rules={{ required: 'Вкажіть дату завдання' }}
+              render={({ field: { onChange, onBlur, value } }) => (
+                <View>
+                  <View
                     style={[
-                      styles.timeChipText,
-                      isSelected && styles.timeChipTextSelected,
+                      styles.inputContainer,
+                      errors.date && styles.inputErrorBorder,
                     ]}
                   >
-                    {time}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+                    <Feather
+                      name="calendar"
+                      size={18}
+                      color={COLORS.primary}
+                      style={styles.inputIcon}
+                    />
+                    <TextInput
+                      style={styles.textInput}
+                      placeholder="Введіть дату або оберіть нижче"
+                      placeholderTextColor={COLORS.textMuted}
+                      value={value}
+                      onBlur={onBlur}
+                      onChangeText={onChange}
+                    />
+                  </View>
 
-          {/* Custom Time Input */}
-          <View style={styles.customTimeContainer}>
-            <Feather name="clock" size={16} color={COLORS.textMuted} style={styles.inputIcon} />
-            <TextInput
-              style={styles.customTimeInput}
-              placeholder="Або введіть свій час (напр. 15:00)"
-              placeholderTextColor={COLORS.textMuted}
-              value={customTime}
-              onChangeText={setCustomTime}
+                  {/* Швидкі пресети дати */}
+                  <View style={styles.datePresets}>
+                    <TouchableOpacity
+                      style={[
+                        styles.dateChip,
+                        value === getTodayString() && styles.dateChipActive,
+                      ]}
+                      onPress={() => onChange(getTodayString())}
+                    >
+                      <Text
+                        style={[
+                          styles.dateChipText,
+                          value === getTodayString() && styles.dateChipTextActive,
+                        ]}
+                      >
+                        Сьогодні ({getTodayString()})
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.dateChip,
+                        value === getTomorrowString() && styles.dateChipActive,
+                      ]}
+                      onPress={() => onChange(getTomorrowString())}
+                    >
+                      <Text
+                        style={[
+                          styles.dateChipText,
+                          value === getTomorrowString() && styles.dateChipTextActive,
+                        ]}
+                      >
+                        Завтра ({getTomorrowString()})
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
             />
-          </View>
+            {errors.date && (
+              <View style={styles.errorRow}>
+                <Feather name="alert-circle" size={13} color={COLORS.danger} />
+                <Text style={styles.errorText}>{errors.date.message}</Text>
+              </View>
+            )}
 
-          {/* Buttons */}
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              onPress={onClose}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.cancelBtnText}>Скасувати</Text>
-            </TouchableOpacity>
+            {/* 3. ПОЛЕ: ПРІОРИТЕТ (low, medium, high) */}
+            <Text style={[styles.label, { marginTop: 14 }]}>Пріоритет *</Text>
+            <Controller
+              control={control}
+              name="priority"
+              rules={{ required: true }}
+              render={({ field: { onChange, value } }) => (
+                <View style={styles.priorityGroup}>
+                  {PRIORITIES.map((p) => {
+                    const isSelected = value === p.key;
+                    return (
+                      <TouchableOpacity
+                        key={p.key}
+                        activeOpacity={0.8}
+                        style={[
+                          styles.priorityCard,
+                          isSelected && {
+                            backgroundColor: p.bg,
+                            borderColor: p.text,
+                          },
+                        ]}
+                        onPress={() => onChange(p.key)}
+                      >
+                        <Feather
+                          name={p.icon as any}
+                          size={16}
+                          color={isSelected ? p.text : COLORS.textMuted}
+                        />
+                        <Text
+                          style={[
+                            styles.priorityCardText,
+                            isSelected && { color: p.text, fontWeight: '800' },
+                          ]}
+                        >
+                          {p.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            />
 
-            <TouchableOpacity
-              style={[
-                styles.submitBtn,
-                !todoText.trim() && styles.submitBtnDisabled,
-              ]}
-              onPress={handleAdd}
-              disabled={!todoText.trim()}
-              activeOpacity={0.85}
-            >
-              <Feather name="plus" size={18} color="#002966" style={{ marginRight: 6 }} />
-              <Text style={styles.submitBtnText}>Додати</Text>
-            </TouchableOpacity>
-          </View>
+            {/* СТАТУС ІНФОРМАЦІЯ */}
+            <View style={styles.statusInfoBox}>
+              <Feather name="info" size={15} color={COLORS.primary} style={{ marginRight: 8 }} />
+              <Text style={styles.statusInfoText}>
+                Статус за замовчуванням: <Text style={{ fontWeight: '800', color: COLORS.primary }}>to-do</Text>
+              </Text>
+            </View>
+
+            {/* КНОПКИ ДІЙ */}
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={onClose}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.cancelBtnText}>Скасувати</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.submitBtn}
+                onPress={() => handleSubmit(onSubmit)()}
+                activeOpacity={0.85}
+              >
+                <Feather name="check-circle" size={18} color="#002966" style={{ marginRight: 6 }} />
+                <Text style={styles.submitBtnText}>Зберегти завдання</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
@@ -200,7 +368,7 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(0, 0, 0, 0.78)',
   },
   sheet: {
     backgroundColor: COLORS.surfaceDark,
@@ -209,6 +377,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22,
     paddingTop: 12,
     paddingBottom: 36,
+    maxHeight: '90%',
     borderWidth: 1.5,
     borderColor: COLORS.border,
   },
@@ -224,7 +393,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 18,
   },
   title: {
     fontSize: 22,
@@ -234,7 +403,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.primary,
     marginTop: 2,
   },
@@ -248,6 +417,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+  label: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: COLORS.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -256,72 +433,98 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: COLORS.border,
     paddingHorizontal: 16,
-    marginBottom: 18,
-    height: 54,
+    height: 52,
+  },
+  inputErrorBorder: {
+    borderColor: COLORS.danger,
   },
   inputIcon: {
     marginRight: 10,
   },
   textInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     color: COLORS.textLight,
     fontWeight: '600',
   },
-  sectionLabel: {
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  errorText: {
     fontSize: 12,
-    fontWeight: '800',
-    color: COLORS.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 10,
+    color: COLORS.danger,
+    fontWeight: '700',
+    marginLeft: 6,
   },
-  chipRow: {
-    marginBottom: 14,
+  datePresets: {
+    flexDirection: 'row',
+    marginTop: 8,
+    gap: 8,
   },
-  chipRowContent: {
-    paddingVertical: 2,
-  },
-  timeChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 14,
+  dateChip: {
     backgroundColor: COLORS.cardDark,
-    marginRight: 8,
-    borderWidth: 1.5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
     borderColor: COLORS.border,
   },
-  timeChipSelected: {
+  dateChipActive: {
     backgroundColor: COLORS.primaryContainer,
     borderColor: COLORS.primary,
   },
-  timeChipText: {
-    fontSize: 13,
-    fontWeight: '700',
+  dateChipText: {
+    fontSize: 12,
     color: COLORS.textMuted,
+    fontWeight: '600',
   },
-  timeChipTextSelected: {
+  dateChipTextActive: {
     color: COLORS.onPrimaryContainer,
+    fontWeight: '800',
   },
-  customTimeContainer: {
+  priorityGroup: {
+    flexDirection: 'column',
+    gap: 8,
+    marginBottom: 14,
+  },
+  priorityCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.cardDark,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    gap: 10,
+  },
+  priorityCardText: {
+    fontSize: 14,
+    color: COLORS.textLight,
+    fontWeight: '600',
+  },
+  statusInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0E1729',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    paddingHorizontal: 14,
-    marginBottom: 24,
-    height: 44,
+    borderColor: '#1D3461',
+    marginBottom: 20,
   },
-  customTimeInput: {
-    flex: 1,
+  statusInfoText: {
     fontSize: 13,
     color: COLORS.textLight,
   },
   actions: {
     flexDirection: 'row',
     gap: 12,
+    marginTop: 4,
   },
   cancelBtn: {
     flex: 1,
@@ -330,7 +533,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.border,
   },
   cancelBtnText: {
@@ -346,9 +549,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  submitBtnDisabled: {
-    opacity: 0.45,
   },
   submitBtnText: {
     fontSize: 15,
