@@ -1,6 +1,13 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Checkbox, IconButton } from 'react-native-paper';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  Animated,
+} from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { Todo } from '../types/todo';
 import { COLORS } from '../constants/theme';
 
@@ -11,6 +18,46 @@ interface TodoItemProps {
 }
 
 export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, onDelete }) => {
+  const [cardScale] = useState(() => new Animated.Value(1));
+  const [checkScale] = useState(() => new Animated.Value(todo.completed ? 1 : 0.85));
+
+  const handlePressIn = () => {
+    Animated.spring(cardScale, {
+      toValue: 0.97,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 200,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(cardScale, {
+      toValue: 1,
+      useNativeDriver: true,
+      friction: 6,
+      tension: 200,
+    }).start();
+  };
+
+  const handleToggleWithAnimation = () => {
+    // Pop animation on the checkbox
+    Animated.sequence([
+      Animated.timing(checkScale, {
+        toValue: 1.3,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+      Animated.spring(checkScale, {
+        toValue: 1,
+        friction: 4,
+        tension: 180,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    onToggle(todo.id);
+  };
+
   const handleLongPress = () => {
     Alert.alert(
       'Видалити завдання?',
@@ -23,49 +70,75 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
   };
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.75}
-      onPress={() => onToggle(todo.id)}
-      onLongPress={handleLongPress}
-      style={[
-        styles.card,
-        todo.completed && styles.cardCompleted,
-      ]}
-    >
-      <View style={styles.leftContent}>
-        <Checkbox.Android
-          status={todo.completed ? 'checked' : 'unchecked'}
-          onPress={() => onToggle(todo.id)}
-          color={COLORS.success}
-          uncheckedColor={COLORS.textMuted}
-        />
-        <Text
-          style={[
-            styles.todoText,
-            todo.completed && styles.todoTextCompleted,
-          ]}
-          numberOfLines={2}
-        >
-          {todo.todo}
-        </Text>
-      </View>
+    <Animated.View style={{ transform: [{ scale: cardScale }] }}>
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={handleToggleWithAnimation}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        onLongPress={handleLongPress}
+        style={[
+          styles.card,
+          todo.completed && styles.cardCompleted,
+        ]}
+      >
+        <View style={styles.leftSection}>
+          {/* Animated Expressive Checkbox Pill */}
+          <Animated.View
+            style={[
+              styles.checkboxContainer,
+              todo.completed ? styles.checkboxCompleted : styles.checkboxIncomplete,
+              { transform: [{ scale: checkScale }] },
+            ]}
+          >
+            {todo.completed ? (
+              <Feather name="check" size={14} color="#00391C" />
+            ) : (
+              <View style={styles.emptyDot} />
+            )}
+          </Animated.View>
 
-      <View style={styles.rightContent}>
-        {todo.time ? (
-          <View style={styles.timeBadge}>
-            <Text style={styles.timeText}>{todo.time}</Text>
-          </View>
-        ) : null}
+          {/* Task title */}
+          <Text
+            style={[
+              styles.todoText,
+              todo.completed && styles.todoTextCompleted,
+            ]}
+            numberOfLines={2}
+          >
+            {todo.todo}
+          </Text>
+        </View>
 
-        <IconButton
-          icon="delete-outline"
-          iconColor={COLORS.textMuted}
-          size={20}
-          onPress={() => onDelete(todo.id)}
-          style={styles.deleteBtn}
-        />
-      </View>
-    </TouchableOpacity>
+        <View style={styles.rightSection}>
+          {todo.time ? (
+            <View
+              style={[
+                styles.timeBadge,
+                todo.completed && styles.timeBadgeCompleted,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.timeText,
+                  todo.completed && styles.timeTextCompleted,
+                ]}
+              >
+                {todo.time}
+              </Text>
+            </View>
+          ) : null}
+
+          <TouchableOpacity
+            onPress={() => onDelete(todo.id)}
+            style={styles.deleteButton}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Feather name="trash-2" size={16} color={COLORS.textMuted} />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
   );
 });
 
@@ -74,59 +147,91 @@ TodoItem.displayName = 'TodoItem';
 const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.cardDark,
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    borderRadius: 22,
+    paddingVertical: 15,
+    paddingHorizontal: 16,
     marginHorizontal: 16,
     marginVertical: 5,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    borderWidth: 1.5,
+    borderColor: COLORS.cardBorder,
   },
   cardCompleted: {
-    backgroundColor: '#141518',
-    borderColor: '#1F2126',
-    opacity: 0.85,
+    backgroundColor: COLORS.cardCompleted,
+    borderColor: COLORS.cardBorderCompleted,
   },
-  leftContent: {
+  leftSection: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    marginRight: 8,
+    marginRight: 10,
+  },
+  checkboxContainer: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  checkboxCompleted: {
+    backgroundColor: COLORS.success,
+  },
+  checkboxIncomplete: {
+    borderWidth: 2,
+    borderColor: COLORS.border,
+    backgroundColor: 'transparent',
+  },
+  emptyDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'transparent',
   },
   todoText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.textLight,
     flex: 1,
-    marginLeft: 6,
-    lineHeight: 20,
+    lineHeight: 21,
+    letterSpacing: -0.2,
   },
   todoTextCompleted: {
     textDecorationLine: 'line-through',
     color: COLORS.textMuted,
+    fontWeight: '500',
   },
-  rightContent: {
+  rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   timeBadge: {
     backgroundColor: COLORS.cardDarkElevated,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginRight: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    marginRight: 6,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+  timeBadgeCompleted: {
+    backgroundColor: '#121419',
+    borderColor: '#1C1F28',
+  },
   timeText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
     color: COLORS.primary,
+    letterSpacing: -0.3,
   },
-  deleteBtn: {
-    margin: 0,
+  timeTextCompleted: {
+    color: COLORS.textMuted,
+  },
+  deleteButton: {
+    padding: 6,
+    borderRadius: 12,
+    opacity: 0.7,
   },
 });

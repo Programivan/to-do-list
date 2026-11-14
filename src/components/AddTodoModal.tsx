@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -8,8 +8,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Animated,
+  TextInput,
 } from 'react-native';
-import { TextInput, Button, IconButton } from 'react-native-paper';
+import { Feather } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
 
 interface AddTodoModalProps {
@@ -18,7 +20,7 @@ interface AddTodoModalProps {
   onAdd: (todoText: string, time: string) => void;
 }
 
-const QUICK_TIMES = ['12 pm', '1 pm', '3 pm', '4 pm', '5 pm', '6 pm', '9 am', '10 am'];
+const QUICK_TIMES = ['12 pm', '1 pm', '3 pm', '4 pm', '5 pm', '6 pm', '9 am', '10 am', '11 am'];
 
 export const AddTodoModal: React.FC<AddTodoModalProps> = ({
   visible,
@@ -28,6 +30,30 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
   const [todoText, setTodoText] = useState('');
   const [selectedTime, setSelectedTime] = useState('12 pm');
   const [customTime, setCustomTime] = useState('');
+
+  const [slideAnim] = useState(() => new Animated.Value(300));
+  const [fadeAnim] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          friction: 8,
+          tension: 140,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      slideAnim.setValue(300);
+      fadeAnim.setValue(0);
+    }
+  }, [visible, slideAnim, fadeAnim]);
 
   const handleAdd = () => {
     if (!todoText.trim()) return;
@@ -41,7 +67,7 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType="none"
       transparent
       onRequestClose={onClose}
     >
@@ -49,38 +75,48 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
         style={styles.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <TouchableOpacity
-          style={styles.backdrop}
-          activeOpacity={1}
-          onPress={onClose}
-        />
+        <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={onClose}
+          />
+        </Animated.View>
 
-        <View style={styles.sheet}>
+        <Animated.View
+          style={[
+            styles.sheet,
+            { transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          {/* M3 Expressive Handle Bar */}
           <View style={styles.dragHandle} />
 
+          {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Нове завдання</Text>
-            <IconButton
-              icon="close"
-              size={20}
-              iconColor={COLORS.textMuted}
-              onPress={onClose}
+            <View>
+              <Text style={styles.title}>Створити завдання</Text>
+              <Text style={styles.subtitle}>Material 3 Expressive</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+              <Feather name="x" size={20} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Input field */}
+          <View style={styles.inputContainer}>
+            <Feather name="edit-3" size={18} color={COLORS.primary} style={styles.inputIcon} />
+            <TextInput
+              style={styles.textInput}
+              placeholder="Що потрібно зробити?"
+              placeholderTextColor={COLORS.textMuted}
+              value={todoText}
+              onChangeText={setTodoText}
+              autoFocus
             />
           </View>
 
-          <TextInput
-            mode="outlined"
-            label="Що потрібно зробити?"
-            placeholder="Введіть назву завдання"
-            value={todoText}
-            onChangeText={setTodoText}
-            textColor={COLORS.textLight}
-            outlineColor={COLORS.border}
-            activeOutlineColor={COLORS.primary}
-            style={styles.input}
-            autoFocus
-          />
-
+          {/* Time Picker Chips */}
           <Text style={styles.sectionLabel}>Час виконання</Text>
           <ScrollView
             horizontal
@@ -93,6 +129,7 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
               return (
                 <TouchableOpacity
                   key={time}
+                  activeOpacity={0.7}
                   style={[
                     styles.timeChip,
                     isSelected && styles.timeChipSelected,
@@ -115,40 +152,42 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
             })}
           </ScrollView>
 
-          <TextInput
-            mode="outlined"
-            label="Або свій час (опціонально)"
-            placeholder="наприклад: 14:30"
-            value={customTime}
-            onChangeText={setCustomTime}
-            textColor={COLORS.textLight}
-            outlineColor={COLORS.border}
-            activeOutlineColor={COLORS.primary}
-            style={styles.customTimeInput}
-          />
+          {/* Custom Time Input */}
+          <View style={styles.customTimeContainer}>
+            <Feather name="clock" size={16} color={COLORS.textMuted} style={styles.inputIcon} />
+            <TextInput
+              style={styles.customTimeInput}
+              placeholder="Або введіть свій час (напр. 15:00)"
+              placeholderTextColor={COLORS.textMuted}
+              value={customTime}
+              onChangeText={setCustomTime}
+            />
+          </View>
 
+          {/* Buttons */}
           <View style={styles.actions}>
-            <Button
-              mode="text"
-              textColor={COLORS.textMuted}
-              onPress={onClose}
+            <TouchableOpacity
               style={styles.cancelBtn}
+              onPress={onClose}
+              activeOpacity={0.7}
             >
-              Скасувати
-            </Button>
-            <Button
-              mode="contained"
-              icon="plus"
-              buttonColor={COLORS.primary}
-              textColor="#002D6C"
+              <Text style={styles.cancelBtnText}>Скасувати</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.submitBtn,
+                !todoText.trim() && styles.submitBtnDisabled,
+              ]}
               onPress={handleAdd}
               disabled={!todoText.trim()}
-              style={styles.submitBtn}
+              activeOpacity={0.85}
             >
-              Створити
-            </Button>
+              <Feather name="plus" size={18} color="#002966" style={{ marginRight: 6 }} />
+              <Text style={styles.submitBtnText}>Додати</Text>
+            </TouchableOpacity>
           </View>
-        </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -158,65 +197,98 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
   },
   backdrop: {
     ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
   },
   sheet: {
     backgroundColor: COLORS.surfaceDark,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 20,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingHorizontal: 22,
     paddingTop: 12,
-    paddingBottom: 32,
-    borderWidth: 1,
+    paddingBottom: 36,
+    borderWidth: 1.5,
     borderColor: COLORS.border,
   },
   dragHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
+    width: 42,
+    height: 5,
+    borderRadius: 3,
     backgroundColor: COLORS.border,
     alignSelf: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
     color: COLORS.textLight,
+    letterSpacing: -0.4,
   },
-  input: {
+  subtitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.primary,
+    marginTop: 2,
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: COLORS.cardDark,
-    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.cardDark,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    paddingHorizontal: 16,
+    marginBottom: 18,
+    height: 54,
+  },
+  inputIcon: {
+    marginRight: 10,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 16,
+    color: COLORS.textLight,
+    fontWeight: '600',
   },
   sectionLabel: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '800',
     color: COLORS.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
+    letterSpacing: 0.8,
+    marginBottom: 10,
   },
   chipRow: {
-    marginBottom: 12,
+    marginBottom: 14,
   },
   chipRowContent: {
-    paddingVertical: 4,
+    paddingVertical: 2,
   },
   timeChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
     backgroundColor: COLORS.cardDark,
     marginRight: 8,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.border,
   },
   timeChipSelected: {
@@ -225,28 +297,62 @@ const styles = StyleSheet.create({
   },
   timeChipText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
     color: COLORS.textMuted,
   },
   timeChipTextSelected: {
     color: COLORS.onPrimaryContainer,
-    fontWeight: '700',
+  },
+  customTimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.cardDark,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 14,
+    marginBottom: 24,
+    height: 44,
   },
   customTimeInput: {
-    backgroundColor: COLORS.cardDark,
-    marginBottom: 20,
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.textLight,
   },
   actions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
     gap: 12,
   },
   cancelBtn: {
-    minWidth: 100,
+    flex: 1,
+    backgroundColor: COLORS.cardDark,
+    borderRadius: 20,
+    paddingVertical: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  cancelBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.textMuted,
   },
   submitBtn: {
-    minWidth: 130,
+    flex: 2,
+    backgroundColor: COLORS.primary,
     borderRadius: 20,
+    paddingVertical: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitBtnDisabled: {
+    opacity: 0.45,
+  },
+  submitBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#002966',
   },
 });
