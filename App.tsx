@@ -1,34 +1,37 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   StyleSheet,
   View,
   Text,
   FlatList,
-  ActivityIndicator,
   RefreshControl,
-  TouchableOpacity,
   Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import {
+  PaperProvider,
+  Appbar,
+  Searchbar,
+  Chip,
+  FAB,
+  Button,
+  ActivityIndicator,
+  IconButton,
+} from 'react-native-paper';
 
 import { Todo, TabType } from './src/types/todo';
-import { COLORS } from './src/constants/theme';
+import { M3DarkTheme, COLORS } from './src/constants/theme';
 import {
   fetchTodos,
   addTodoApi,
   toggleTodoApi,
   deleteTodoApi,
 } from './src/services/todoApi';
-import { Header } from './src/components/Header';
 import { TodoItem } from './src/components/TodoItem';
-import { BottomNavBar } from './src/components/BottomNavBar';
 import { AddTodoModal } from './src/components/AddTodoModal';
-import { SearchBar } from './src/components/SearchBar';
-import { ProfileModal } from './src/components/ProfileModal';
 
-function getFormattedToday(): string {
+function getFormattedDate(): string {
   const d = new Date();
   const day = d.getDate();
   const suffix = (n: number) => {
@@ -42,7 +45,7 @@ function getFormattedToday(): string {
   };
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
+    'July', 'August', 'September', 'October', 'November', 'December',
   ];
   return `${day}${suffix(day)} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
@@ -50,34 +53,28 @@ function getFormattedToday(): string {
 function MainScreen() {
   const insets = useSafeAreaInsets();
 
+  // Initial list is empty as requested ("удали весь список")
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<TabType>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchActive, setIsSearchActive] = useState(false);
-
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
-  // Toggle between mock date ("4th March 2018") and today's date
-  const [useTodayDate, setUseTodayDate] = useState(false);
-  const currentDateText = useTodayDate ? getFormattedToday() : '4th March 2018';
-
-  const loadTodosData = useCallback(async (isRefresh = false) => {
+  // Load from DummyJSON API
+  const handleLoadFromApi = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) {
         setRefreshing(true);
       } else {
         setLoading(true);
       }
-      setError(null);
       const data = await fetchTodos(30, 0);
       setTodos(data.todos);
-    } catch (err: any) {
-      setError('Не вдалося завантажити завдання. Перевірте зʼєднання.');
+    } catch (err) {
+      Alert.alert('Помилка', 'Не вдалося завантажити завдання із сервера');
       console.error(err);
     } finally {
       setLoading(false);
@@ -85,9 +82,18 @@ function MainScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    loadTodosData();
-  }, [loadTodosData]);
+  // Clear entire list
+  const handleClearAll = useCallback(() => {
+    if (todos.length === 0) return;
+    Alert.alert(
+      'Очистити список',
+      'Ви впевнені, що хочете видалити всі завдання?',
+      [
+        { text: 'Скасувати', style: 'cancel' },
+        { text: 'Очистити', style: 'destructive', onPress: () => setTodos([]) },
+      ]
+    );
+  }, [todos.length]);
 
   const handleToggle = useCallback(async (id: number) => {
     setTodos((prev) =>
@@ -95,7 +101,6 @@ function MainScreen() {
         item.id === id ? { ...item, completed: !item.completed } : item
       )
     );
-
     const target = todos.find((t) => t.id === id);
     if (target) {
       await toggleTodoApi(id, !target.completed);
@@ -108,7 +113,6 @@ function MainScreen() {
   }, []);
 
   const handleAddTodo = useCallback(async (text: string, time: string) => {
-    // Optimistic item
     const tempId = Date.now();
     const newTodo: Todo = {
       id: tempId,
@@ -119,33 +123,22 @@ function MainScreen() {
     };
     setTodos((prev) => [newTodo, ...prev]);
 
-    // Send API request
     try {
       const serverTodo = await addTodoApi(text, time);
       setTodos((prev) =>
         prev.map((t) => (t.id === tempId ? { ...t, id: serverTodo.id } : t))
       );
     } catch (e) {
-      console.warn('Using local fallback for added todo:', e);
+      console.warn('Local fallback used for added todo:', e);
     }
   }, []);
 
-  const handleSelectTab = (tab: TabType) => {
-    if (tab === 'profile') {
-      setIsProfileModalOpen(true);
-      return;
-    }
-    setActiveTab(tab);
-  };
-
-  // Filtered list based on active tab and search query
+  // Filtered todos
   const filteredTodos = useMemo(() => {
     return todos.filter((item) => {
-      // Tab filter
       if (activeTab === 'pending' && item.completed) return false;
       if (activeTab === 'completed' && !item.completed) return false;
 
-      // Search filter
       if (searchQuery.trim().length > 0) {
         return item.todo.toLowerCase().includes(searchQuery.toLowerCase());
       }
@@ -154,66 +147,92 @@ function MainScreen() {
   }, [todos, activeTab, searchQuery]);
 
   const totalCount = todos.length;
+  const pendingCount = todos.filter((t) => !t.completed).length;
   const completedCount = todos.filter((t) => t.completed).length;
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <StatusBar style="dark" />
+    <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <StatusBar style="light" />
 
-      {/* Header section matching mockup */}
-      <Header
-        totalTasks={totalCount}
-        completedTasks={completedCount}
-        currentDateText={currentDateText}
-        onToggleDate={() => setUseTodayDate((prev) => !prev)}
-        onOpenSearch={() => {
-          setIsSearchActive((prev) => !prev);
-          if (isSearchActive) setSearchQuery('');
-        }}
-        isSearchActive={isSearchActive}
-      />
-
-      {/* Search Input when search is toggled */}
-      {isSearchActive && (
-        <SearchBar
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          onClear={() => setSearchQuery('')}
+      {/* Material 3 Appbar */}
+      <Appbar.Header style={styles.appBar}>
+        <Appbar.Content
+          title="ODOT List"
+          titleStyle={styles.appBarTitle}
+          subtitle={getFormattedDate()}
+          subtitleStyle={styles.appBarSubtitle}
         />
-      )}
+        <Appbar.Action
+          icon={isSearchVisible ? 'close' : 'magnify'}
+          iconColor={COLORS.textLight}
+          onPress={() => {
+            setIsSearchVisible((v) => !v);
+            if (isSearchVisible) setSearchQuery('');
+          }}
+        />
+        <Appbar.Action
+          icon="cloud-download-outline"
+          iconColor={COLORS.primary}
+          onPress={() => handleLoadFromApi(false)}
+        />
+        {todos.length > 0 && (
+          <Appbar.Action
+            icon="delete-sweep-outline"
+            iconColor={COLORS.danger}
+            onPress={handleClearAll}
+          />
+        )}
+      </Appbar.Header>
 
-      {/* Active Tab Filter Indicator */}
-      {activeTab !== 'all' && (
-        <View style={styles.activeFilterBar}>
-          <Text style={styles.activeFilterText}>
-            Фільтр: {activeTab === 'pending' ? 'В процесі' : 'Виконані'}
-          </Text>
-          <TouchableOpacity
-            onPress={() => setActiveTab('all')}
-            style={styles.clearFilterBtn}
-          >
-            <Text style={styles.clearFilterText}>Показати всі</Text>
-          </TouchableOpacity>
+      {/* Searchbar */}
+      {isSearchVisible && (
+        <View style={styles.searchWrapper}>
+          <Searchbar
+            placeholder="Пошук завдань..."
+            onChangeText={setSearchQuery}
+            value={searchQuery}
+            style={styles.searchBar}
+            inputStyle={styles.searchInput}
+            iconColor={COLORS.primary}
+            autoFocus
+          />
         </View>
       )}
 
-      {/* Main List Area */}
-      <View style={styles.listContainer}>
-        {loading && !refreshing ? (
-          <View style={styles.centered}>
+      {/* Material 3 Filter Chips */}
+      <View style={styles.chipContainer}>
+        <Chip
+          selected={activeTab === 'all'}
+          onPress={() => setActiveTab('all')}
+          style={[styles.chip, activeTab === 'all' && styles.chipActive]}
+          textStyle={[styles.chipText, activeTab === 'all' && styles.chipTextActive]}
+        >
+          Всі ({totalCount})
+        </Chip>
+        <Chip
+          selected={activeTab === 'pending'}
+          onPress={() => setActiveTab('pending')}
+          style={[styles.chip, activeTab === 'pending' && styles.chipActive]}
+          textStyle={[styles.chipText, activeTab === 'pending' && styles.chipTextActive]}
+        >
+          В процесі ({pendingCount})
+        </Chip>
+        <Chip
+          selected={activeTab === 'completed'}
+          onPress={() => setActiveTab('completed')}
+          style={[styles.chip, activeTab === 'completed' && styles.chipActive]}
+          textStyle={[styles.chipText, activeTab === 'completed' && styles.chipTextActive]}
+        >
+          Виконані ({completedCount})
+        </Chip>
+      </View>
+
+      {/* List Container */}
+      <View style={styles.listArea}>
+        {loading ? (
+          <View style={styles.centerBox}>
             <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text style={styles.loadingText}>Завантаження списку завдань...</Text>
-          </View>
-        ) : error && todos.length === 0 ? (
-          <View style={styles.centered}>
-            <Feather name="alert-circle" size={40} color={COLORS.danger} />
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={() => loadTodosData()}
-            >
-              <Text style={styles.retryButtonText}>Повторити спробу</Text>
-            </TouchableOpacity>
+            <Text style={styles.loadingText}>Завантаження з DummyJSON...</Text>
           </View>
         ) : (
           <FlatList
@@ -226,37 +245,66 @@ function MainScreen() {
                 onDelete={handleDelete}
               />
             )}
-            contentContainerStyle={styles.flatListContent}
+            contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
-                onRefresh={() => loadTodosData(true)}
+                onRefresh={() => handleLoadFromApi(true)}
                 tintColor={COLORS.primary}
                 colors={[COLORS.primary]}
               />
             }
             ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Feather name="inbox" size={48} color={COLORS.iconInactive} />
-                <Text style={styles.emptyTitle}>Завдань не знайдено</Text>
+              <View style={styles.emptyCard}>
+                <IconButton
+                  icon="checkbox-marked-circle-outline"
+                  size={52}
+                  iconColor={COLORS.primary}
+                  style={styles.emptyIcon}
+                />
+                <Text style={styles.emptyTitle}>Список завдань порожній</Text>
                 <Text style={styles.emptySubtitle}>
                   {searchQuery
-                    ? 'Спробуйте інший пошуковий запит'
-                    : 'Натисніть "+", щоб додати перше завдання'}
+                    ? 'Нічого не знайдено за вашим запитом'
+                    : 'Створіть власне завдання або завантажте з DummyJSON API'}
                 </Text>
+
+                <View style={styles.emptyActions}>
+                  <Button
+                    mode="contained"
+                    icon="plus"
+                    buttonColor={COLORS.primary}
+                    textColor="#002D6C"
+                    onPress={() => setIsAddModalOpen(true)}
+                    style={styles.emptyBtn}
+                  >
+                    Додати завдання
+                  </Button>
+
+                  <Button
+                    mode="outlined"
+                    icon="cloud-download"
+                    textColor={COLORS.primary}
+                    onPress={() => handleLoadFromApi(false)}
+                    style={styles.emptyBtnOutline}
+                  >
+                    Завантажити з API
+                  </Button>
+                </View>
               </View>
             }
           />
         )}
       </View>
 
-      {/* Bottom Navigation with Floating Action Button */}
-      <BottomNavBar
-        activeTab={activeTab}
-        onSelectTab={handleSelectTab}
-        onOpenAddModal={() => setIsAddModalOpen(true)}
-        bottomInset={insets.bottom}
+      {/* Material 3 Rounded Square FAB */}
+      <FAB
+        icon="plus"
+        color="#002D6C"
+        style={styles.fab}
+        onPress={() => setIsAddModalOpen(true)}
+        mode="elevated"
       />
 
       {/* Add Task Modal */}
@@ -265,15 +313,6 @@ function MainScreen() {
         onClose={() => setIsAddModalOpen(false)}
         onAdd={handleAddTodo}
       />
-
-      {/* Profile & Stats Modal */}
-      <ProfileModal
-        visible={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-        total={totalCount}
-        completed={completedCount}
-        onResetData={() => loadTodosData()}
-      />
     </View>
   );
 }
@@ -281,7 +320,9 @@ function MainScreen() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <MainScreen />
+      <PaperProvider theme={M3DarkTheme}>
+        <MainScreen />
+      </PaperProvider>
     </SafeAreaProvider>
   );
 }
@@ -289,87 +330,127 @@ export default function App() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: COLORS.screenBg,
+    backgroundColor: COLORS.black,
   },
-  listContainer: {
+  appBar: {
+    backgroundColor: COLORS.black,
+    elevation: 0,
+  },
+  appBarTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: COLORS.textLight,
+  },
+  appBarSubtitle: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    fontWeight: '600',
+  },
+  searchWrapper: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  searchBar: {
+    backgroundColor: COLORS.cardDark,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    height: 46,
+  },
+  searchInput: {
+    fontSize: 14,
+    color: COLORS.textLight,
+    alignSelf: 'center',
+  },
+  chipContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  chip: {
+    backgroundColor: COLORS.cardDark,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  chipActive: {
+    backgroundColor: COLORS.primaryContainer,
+    borderColor: COLORS.primary,
+  },
+  chipText: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    fontWeight: '600',
+  },
+  chipTextActive: {
+    color: COLORS.onPrimaryContainer,
+    fontWeight: '700',
+  },
+  listArea: {
     flex: 1,
-    backgroundColor: COLORS.listBg,
+    backgroundColor: COLORS.black,
   },
-  flatListContent: {
-    paddingTop: 12,
-    paddingBottom: 40,
+  listContent: {
+    paddingTop: 8,
+    paddingBottom: 90,
   },
-  centered: {
+  centerBox: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: 14,
     fontSize: 14,
     color: COLORS.textMuted,
     fontWeight: '600',
   },
-  errorText: {
-    marginTop: 12,
-    fontSize: 15,
-    color: COLORS.danger,
-    textAlign: 'center',
-    lineHeight: 22,
-    fontWeight: '600',
-  },
-  retryButton: {
-    marginTop: 16,
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  retryButtonText: {
-    color: COLORS.white,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  activeFilterBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  emptyCard: {
+    marginHorizontal: 20,
+    marginTop: 40,
+    backgroundColor: COLORS.cardDark,
+    borderRadius: 24,
+    padding: 28,
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 8,
-    backgroundColor: COLORS.primaryLight,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  activeFilterText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.primaryDark,
-  },
-  clearFilterBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  clearFilterText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.primary,
-    textDecorationLine: 'underline',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 80,
-    paddingHorizontal: 40,
+  emptyIcon: {
+    margin: 0,
+    marginBottom: 8,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    color: COLORS.textSubtitle,
-    marginTop: 14,
+    color: COLORS.textLight,
+    textAlign: 'center',
+    marginBottom: 6,
   },
   emptySubtitle: {
     fontSize: 14,
     color: COLORS.textMuted,
-    marginTop: 6,
     textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  emptyActions: {
+    width: '100%',
+    gap: 12,
+  },
+  emptyBtn: {
+    borderRadius: 14,
+  },
+  emptyBtnOutline: {
+    borderRadius: 14,
+    borderColor: COLORS.border,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 24,
+    borderRadius: 16,
+    backgroundColor: COLORS.primary,
   },
 });

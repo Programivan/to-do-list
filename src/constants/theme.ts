@@ -1,21 +1,63 @@
+import { MD3DarkTheme } from 'react-native-paper';
+
+export const M3DarkTheme = {
+  ...MD3DarkTheme,
+  dark: true,
+  colors: {
+    ...MD3DarkTheme.colors,
+    primary: '#A8C7FA',
+    onPrimary: '#062E6F',
+    primaryContainer: '#0842A0',
+    onPrimaryContainer: '#D3E3FD',
+    secondary: '#C2E7FF',
+    onSecondary: '#003355',
+    secondaryContainer: '#004A77',
+    onSecondaryContainer: '#C2E7FF',
+    tertiary: '#C4E7FF',
+    surface: '#000000', // AMOLED pure black
+    surfaceContainerLowest: '#0A0B0E',
+    surfaceContainerLow: '#121316',
+    surfaceContainer: '#1A1C1F', // Card surface
+    surfaceContainerHigh: '#23252A',
+    surfaceContainerHighest: '#2E3036',
+    onSurface: '#E3E2E6',
+    onSurfaceVariant: '#C4C6D0',
+    outline: '#44474E',
+    outlineVariant: '#2E3036',
+    background: '#000000',
+    error: '#F2B8B5',
+    errorContainer: '#8C1D18',
+    onError: '#601410',
+    onErrorContainer: '#F9DEDC',
+    success: '#81C995',
+  },
+};
+
 export const COLORS = {
-  primary: '#4D86F7',
-  primaryDark: '#366FE0',
-  primaryLight: '#EBF1FF',
-  success: '#3ECB98',
-  successDark: '#33B284',
-  textDark: '#1A2130',
-  textSubtitle: '#242D3C',
-  textBody: '#202838',
-  textMuted: '#9AA5B6',
-  textTime: '#3B4657',
-  cardBg: '#FFFFFF',
-  screenBg: '#FFFFFF',
-  listBg: '#F4F7FB',
-  iconInactive: '#A4B0C2',
-  border: '#E8EDF5',
-  cardBorder: '#EEF2F7',
-  danger: '#EF4444',
+  black: '#000000',
+  surfaceDark: '#121316',
+  cardDark: '#1A1C20',
+  cardDarkElevated: '#24262C',
+  primary: '#A8C7FA',
+  primaryDark: '#0842A0',
+  primaryLight: '#1B2A47',
+  primaryContainer: '#0842A0',
+  onPrimaryContainer: '#D3E3FD',
+  success: '#81C995',
+  successDark: '#2E7D32',
+  danger: '#F2B8B5',
+  textLight: '#E3E2E6',
+  textDark: '#E3E2E6',
+  textSubtitle: '#C4C6D0',
+  textBody: '#E3E2E6',
+  textMuted: '#90949F',
+  textTime: '#A8C7FA',
+  cardBg: '#1A1C20',
+  cardBorder: '#2A2C32',
+  screenBg: '#000000',
+  listBg: '#000000',
+  iconInactive: '#717582',
+  border: '#2A2C32',
   white: '#FFFFFF',
 };
 
@@ -34,7 +76,6 @@ export const DEFAULT_TIMES = [
 ];
 
 export function getTaskTime(index: number, id: number): string {
-  // Matches the sequence from the mock: 12 pm, 1 pm, 3 pm, 4 pm, 5 pm, ...
   const mockSequence = ['12 pm', '1 pm', '3 pm', '4 pm', '5 pm', '6 pm', '7 pm', '9 am', '10 am', '11 am'];
   if (index < mockSequence.length) {
     return mockSequence[index];

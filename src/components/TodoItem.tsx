@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Checkbox, IconButton } from 'react-native-paper';
 import { Todo } from '../types/todo';
 import { COLORS } from '../constants/theme';
 
@@ -10,11 +10,11 @@ interface TodoItemProps {
   onDelete: (id: number) => void;
 }
 
-export const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) => {
+export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, onDelete }) => {
   const handleLongPress = () => {
     Alert.alert(
       'Видалити завдання?',
-      `Ви впевнені, що хочете видалити "${todo.todo}"?`,
+      `Видалити "${todo.todo}"?`,
       [
         { text: 'Скасувати', style: 'cancel' },
         { text: 'Видалити', style: 'destructive', onPress: () => onDelete(todo.id) },
@@ -24,7 +24,7 @@ export const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) 
 
   return (
     <TouchableOpacity
-      activeOpacity={0.8}
+      activeOpacity={0.75}
       onPress={() => onToggle(todo.id)}
       onLongPress={handleLongPress}
       style={[
@@ -32,22 +32,13 @@ export const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) 
         todo.completed && styles.cardCompleted,
       ]}
     >
-      <View style={styles.leftSection}>
-        {/* Checkmark circle or subtle empty radio indicator */}
-        <TouchableOpacity
+      <View style={styles.leftContent}>
+        <Checkbox.Android
+          status={todo.completed ? 'checked' : 'unchecked'}
           onPress={() => onToggle(todo.id)}
-          style={[
-            styles.checkCircle,
-            todo.completed ? styles.checkCircleCompleted : styles.checkCircleIncomplete,
-          ]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          {todo.completed && (
-            <Feather name="check" size={13} color={COLORS.white} />
-          )}
-        </TouchableOpacity>
-
-        {/* Task description */}
+          color={COLORS.success}
+          uncheckedColor={COLORS.textMuted}
+        />
         <Text
           style={[
             styles.todoText,
@@ -59,99 +50,83 @@ export const TodoItem: React.FC<TodoItemProps> = ({ todo, onToggle, onDelete }) 
         </Text>
       </View>
 
-      {/* Right side: Time display */}
-      <View style={styles.rightSection}>
-        <Text style={[styles.timeText, todo.completed && styles.timeTextCompleted]}>
-          {todo.time || '12 pm'}
-        </Text>
+      <View style={styles.rightContent}>
+        {todo.time ? (
+          <View style={styles.timeBadge}>
+            <Text style={styles.timeText}>{todo.time}</Text>
+          </View>
+        ) : null}
 
-        <TouchableOpacity
+        <IconButton
+          icon="delete-outline"
+          iconColor={COLORS.textMuted}
+          size={20}
           onPress={() => onDelete(todo.id)}
-          style={styles.deleteButton}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Feather name="trash-2" size={14} color={COLORS.iconInactive} />
-        </TouchableOpacity>
+          style={styles.deleteBtn}
+        />
       </View>
     </TouchableOpacity>
   );
-};
+});
+
+TodoItem.displayName = 'TodoItem';
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 14,
-    paddingVertical: 18,
-    paddingHorizontal: 18,
-    marginHorizontal: 20,
-    marginVertical: 6,
+    backgroundColor: COLORS.cardDark,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginHorizontal: 16,
+    marginVertical: 5,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    // iOS shadow
-    shadowColor: '#50668F',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    // Android elevation
-    elevation: 2.5,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: COLORS.border,
   },
   cardCompleted: {
-    backgroundColor: '#FCFDFF',
-    borderColor: '#EEF2F6',
+    backgroundColor: '#141518',
+    borderColor: '#1F2126',
+    opacity: 0.85,
   },
-  leftSection: {
+  leftContent: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    marginRight: 12,
-  },
-  checkCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  checkCircleCompleted: {
-    backgroundColor: COLORS.success,
-  },
-  checkCircleIncomplete: {
-    borderWidth: 1.5,
-    borderColor: '#D4DCED',
-    backgroundColor: 'transparent',
+    marginRight: 8,
   },
   todoText: {
     fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.textBody,
+    fontWeight: '600',
+    color: COLORS.textLight,
     flex: 1,
-    letterSpacing: -0.2,
+    marginLeft: 6,
+    lineHeight: 20,
   },
   todoTextCompleted: {
     textDecorationLine: 'line-through',
     color: COLORS.textMuted,
-    fontWeight: '600',
   },
-  rightSection: {
+  rightContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  timeBadge: {
+    backgroundColor: COLORS.cardDarkElevated,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginRight: 2,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
   timeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.textTime,
-    letterSpacing: -0.2,
-    marginRight: 8,
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
-  timeTextCompleted: {
-    color: COLORS.textMuted,
-  },
-  deleteButton: {
-    padding: 2,
-    opacity: 0.6,
+  deleteBtn: {
+    margin: 0,
   },
 });
