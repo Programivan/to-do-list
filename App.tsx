@@ -65,7 +65,7 @@ function getFormattedDate(): string {
 function MainScreen() {
   const insets = useSafeAreaInsets();
 
-  // Material You Dynamic Theme State
+  // Dynamic Theme State
   const [activePaletteId, setActivePaletteId] = useState<MaterialYouPaletteId>('ocean');
   const currentTheme = MATERIAL_YOU_PALETTES[activePaletteId];
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
@@ -259,11 +259,11 @@ function MainScreen() {
     <View style={styles.screen}>
       <StatusBar style="light" />
 
-      {/* Dynamic Ambient Liquid Mesh Background ("Рідке Скло") */}
+      {/* Ambient Mesh Background */}
       <LiquidBackground theme={currentTheme} />
 
       <View style={[styles.mainContainer, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-        {/* Floating Liquid Glass Top App Bar */}
+        {/* Top App Bar */}
         <View style={styles.glassTopBarContainer}>
           <BlurView intensity={GLASS_TOKENS.blurIntensityHeader} tint="dark" style={StyleSheet.absoluteFill} />
           <LinearGradient
@@ -276,10 +276,7 @@ function MainScreen() {
           <View style={styles.topAppBar}>
             <View style={styles.titleArea}>
               <View style={styles.appTitleRow}>
-                <Text style={styles.appTitle}>ODOT List</Text>
-                <View style={[styles.glassBadge, { borderColor: `${currentTheme.primary}50` }]}>
-                  <Text style={[styles.glassBadgeText, { color: currentTheme.primary }]}>Glass M3</Text>
-                </View>
+                <Text style={styles.appTitle}>ToDo List</Text>
               </View>
 
               <TouchableOpacity
@@ -296,9 +293,9 @@ function MainScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Top Action Buttons with Glass Styling */}
+            {/* Top Action Buttons */}
             <View style={styles.actionsRow}>
-              {/* Material You Theme Swatch Button */}
+              {/* Theme Swatch Button */}
               <TouchableOpacity
                 style={[styles.glassIconBtn, { borderColor: `${currentTheme.primary}60` }]}
                 onPress={() => {
@@ -355,7 +352,7 @@ function MainScreen() {
           </View>
         </View>
 
-        {/* Liquid Glass Progress Bar */}
+        {/* Progress Bar */}
         {totalCount > 0 && (
           <View style={styles.progressSection}>
             <View style={styles.glassProgressCard}>
@@ -383,7 +380,7 @@ function MainScreen() {
           </View>
         )}
 
-        {/* Liquid Glass Searchbar */}
+        {/* Searchbar */}
         {isSearchVisible && (
           <View style={styles.searchSection}>
             <View style={styles.glassSearchContainer}>
@@ -412,7 +409,7 @@ function MainScreen() {
           </View>
         )}
 
-        {/* Liquid Glass Filter Chips */}
+        {/* Filter Chips */}
         <View style={styles.filterRow}>
           <TouchableOpacity
             style={[
@@ -638,7 +635,7 @@ function MainScreen() {
           )}
         </View>
 
-        {/* Liquid Glass FAB with Spring Bounce & Multi-Layer Glow */}
+        {/* FAB with Spring Bounce & Multi-Layer Glow */}
         <Animated.View style={[styles.fabContainer, { transform: [{ scale: fabScale }] }]}>
           <TouchableOpacity
             style={styles.fab}
@@ -669,7 +666,7 @@ function MainScreen() {
           theme={currentTheme}
         />
 
-        {/* Modal 2: Material You Dynamic Palette Selector */}
+        {/* Modal 2: Dynamic Palette Selector */}
         <ThemeSelectorModal
           visible={isThemeModalOpen}
           activePaletteId={activePaletteId}

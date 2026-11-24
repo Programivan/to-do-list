@@ -31,7 +31,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             <View style={styles.avatar}>
               <Feather name="user" size={28} color={COLORS.primary} />
             </View>
-            <Text style={styles.title}>Профіль ODOT</Text>
+            <Text style={styles.title}>Профіль ToDo</Text>
             <Text style={styles.subtitle}>Статистика виконання завдань</Text>
           </View>
 

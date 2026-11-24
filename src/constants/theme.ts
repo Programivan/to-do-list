@@ -29,7 +29,7 @@ export const MATERIAL_YOU_PALETTES: Record<MaterialYouPaletteId, MaterialYouPale
   ocean: {
     id: 'ocean',
     name: 'Ocean Dynamic',
-    nameUa: 'Океан (M3 Blue)',
+    nameUa: 'Океан (Синій)',
     primary: '#7CA8FF',
     onPrimary: '#002B6D',
     primaryContainer: '#1D3D78',
@@ -51,7 +51,7 @@ export const MATERIAL_YOU_PALETTES: Record<MaterialYouPaletteId, MaterialYouPale
   lavender: {
     id: 'lavender',
     name: 'Lavender Mist',
-    nameUa: 'Лаванда (Expressive)',
+    nameUa: 'Лаванда (Фіолетовий)',
     primary: '#D8B4FE',
     onPrimary: '#430076',
     primaryContainer: '#54228A',
@@ -73,7 +73,7 @@ export const MATERIAL_YOU_PALETTES: Record<MaterialYouPaletteId, MaterialYouPale
   sunset: {
     id: 'sunset',
     name: 'Sunset Peach',
-    nameUa: 'Персик (Warm Sunset)',
+    nameUa: 'Персик (Теплий)',
     primary: '#FFAF96',
     onPrimary: '#5C1A05',
     primaryContainer: '#6E2713',
@@ -95,7 +95,7 @@ export const MATERIAL_YOU_PALETTES: Record<MaterialYouPaletteId, MaterialYouPale
   emerald: {
     id: 'emerald',
     name: 'Emerald Mint',
-    nameUa: 'Смарагд (Mint Natural)',
+    nameUa: 'Смарагд (Зелений)',
     primary: '#69E2A8',
     onPrimary: '#003920',
     primaryContainer: '#135433',
@@ -117,7 +117,7 @@ export const MATERIAL_YOU_PALETTES: Record<MaterialYouPaletteId, MaterialYouPale
   amber: {
     id: 'amber',
     name: 'Amber Honey',
-    nameUa: 'Бурштин (Honey Gold)',
+    nameUa: 'Бурштин (Золотий)',
     primary: '#FDD663',
     onPrimary: '#3F2E00',
     primaryContainer: '#5B4300',
@@ -138,7 +138,7 @@ export const MATERIAL_YOU_PALETTES: Record<MaterialYouPaletteId, MaterialYouPale
   },
 };
 
-// Liquid Glass Design Tokens (Жидке Скло)
+// UI Design Tokens
 export const GLASS_TOKENS = {
   // Translucent glass backgrounds
   cardGlassBg: 'rgba(22, 26, 38, 0.65)',

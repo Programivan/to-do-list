@@ -27,7 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Centered Main Title as in mockup */}
       <View style={styles.topRow}>
         <View style={styles.sidePlaceholder} />
-        <Text style={styles.appTitle}>ODOT List</Text>
+        <Text style={styles.appTitle}>ToDo List</Text>
         <TouchableOpacity
           onPress={onOpenSearch}
           style={styles.searchIconButton}

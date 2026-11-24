@@ -169,7 +169,7 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
           />
         </Animated.View>
 
-        {/* Liquid Glass Modal Bottom Sheet */}
+        {/* Modal Bottom Sheet */}
         <Animated.View
           style={[
             styles.sheet,
@@ -198,7 +198,7 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
               </View>
               <View>
                 <Text style={styles.title}>Нове завдання</Text>
-                <Text style={styles.subtitle}>React Hook Form • Рідке Скло & M3</Text>
+                <Text style={styles.subtitle}>Створення нового завдання</Text>
               </View>
             </View>
             <TouchableOpacity
@@ -288,7 +288,7 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
                     />
                   </View>
 
-                  {/* Liquid Glass Date Presets */}
+                  {/* Date Presets */}
                   <View style={styles.datePresets}>
                     <TouchableOpacity
                       style={[

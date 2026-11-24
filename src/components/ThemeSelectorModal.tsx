@@ -61,8 +61,8 @@ export const ThemeSelectorModal: React.FC<ThemeSelectorModalProps> = ({
                     <Feather name="droplet" size={16} color={currentTheme.primary} />
                   </View>
                   <View>
-                    <Text style={styles.title}>Material You Палітра</Text>
-                    <Text style={styles.subtitle}>Динамічні кольори Material 3 & Скло</Text>
+                    <Text style={styles.title}>Колірна тема</Text>
+                    <Text style={styles.subtitle}>Оберіть тему оформлення</Text>
                   </View>
                 </View>
                 <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>

@@ -135,7 +135,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Specular Top Edge Refraction Line (Liquid Glass Shine) */}
+        {/* Top Edge Refraction Line */}
         <LinearGradient
           colors={todo.completed ? GLASS_TOKENS.sheenGradientSubtle : GLASS_TOKENS.sheenGradient}
           start={{ x: 0, y: 0 }}
@@ -144,7 +144,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
         />
 
         <View style={styles.topRow}>
-          {/* Frosted Glass Checkbox with Material You Accent */}
+          {/* Checkbox with Accent */}
           <Animated.View
             style={[
               styles.checkboxContainer,
@@ -188,7 +188,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
         {/* Meta row: Priority Badge, Date Badge, Status Pill */}
         <View style={styles.metaRow}>
           <View style={styles.metaLeft}>
-            {/* Liquid Glass Priority Badge */}
+            {/* Priority Badge */}
             <View
               style={[
                 styles.badge,
@@ -206,7 +206,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
               </Text>
             </View>
 
-            {/* Liquid Glass Date Badge */}
+            {/* Date Badge */}
             {todo.date ? (
               <View style={styles.dateBadge}>
                 <Feather name="calendar" size={11} color={theme.primary} style={{ marginRight: 4 }} />
