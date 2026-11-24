@@ -1,96 +1,113 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  StyleSheet,
-  View,
-  Text,
+  Animated,
   FlatList,
   RefreshControl,
-  Alert,
-  TouchableOpacity,
-  Animated,
-  Platform,
-  UIManager,
+  StyleSheet,
+  Text,
   TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useBottomTabBarHeight } from 'expo-router/js-tabs';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 
-import { Todo, TabType, TodoFormData } from './src/types/todo';
-import {
-  MaterialYouPaletteId,
-  MATERIAL_YOU_PALETTES,
-  GLASS_TOKENS,
-  COLORS,
-} from './src/constants/theme';
-import {
-  fetchTodos,
-  addTodoApi,
-  toggleTodoApi,
-  deleteTodoApi,
-} from './src/services/todoApi';
-import { TodoItem } from './src/components/TodoItem';
-import { AddTodoModal } from './src/components/AddTodoModal';
-import { LiquidBackground } from './src/components/LiquidBackground';
-import { ThemeSelectorModal } from './src/components/ThemeSelectorModal';
-import { triggerHaptic, triggerNotificationHaptic } from './src/utils/haptics';
+import { COLORS, GLASS_TOKENS } from '@/constants/theme';
+import { useTodoContext } from '@/context/TodoContext';
+import { LiquidBackground } from '@/components/LiquidBackground';
+import { TodoItem } from '@/components/TodoItem';
+import { triggerHaptic } from '@/utils/haptics';
 
-// Enable LayoutAnimation for Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
+export type TodoListFilter = 'all' | 'pending' | 'completed';
+
+interface TodoListScreenProps {
+  filter: TodoListFilter;
 }
 
-function getFormattedDate(): string {
-  const d = new Date();
-  const day = d.getDate();
-  const suffix = (n: number) => {
-    if (n > 3 && n < 21) return 'th';
-    switch (n % 10) {
-      case 1: return 'st';
-      case 2: return 'nd';
-      case 3: return 'rd';
-      default: return 'th';
-    }
-  };
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-  return `${day}${suffix(day)} ${months[d.getMonth()]} ${d.getFullYear()}`;
-}
+const FILTER_META: Record<
+  TodoListFilter,
+  {
+    headerTitle: string;
+    emptyTitle: string;
+    emptySubtitle: string;
+    emptyIcon: React.ComponentProps<typeof Feather>['name'];
+  }
+> = {
+  all: {
+    headerTitle: 'ToDo List',
+    emptyTitle: 'Список завдань порожній',
+    emptySubtitle:
+      'Створіть нове завдання через форму з React Hook Form або завантажте з DummyJSON',
+    emptyIcon: 'check',
+  },
+  pending: {
+    headerTitle: 'В роботі',
+    emptyTitle: 'Немає активних завдань',
+    emptySubtitle:
+      'Усі заплановані завдання виконано або додайте нове завдання до списку',
+    emptyIcon: 'clock',
+  },
+  completed: {
+    headerTitle: 'Виконані',
+    emptyTitle: 'Поки що немає виконаних',
+    emptySubtitle:
+      'Позначте завдання як виконані у вкладці «Всі» або «В роботі», і вони з’являться тут',
+    emptyIcon: 'check-circle',
+  },
+};
 
-function MainScreen() {
+/**
+ * Shared glassmorphic task list screen rendered by the All, Pending, and Completed tabs.
+ */
+export const TodoListScreen: React.FC<TodoListScreenProps> = ({ filter }) => {
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
+  const {
+    currentTheme,
+    todos,
+    loading,
+    refreshing,
+    searchQuery,
+    setSearchQuery,
+    isSearchVisible,
+    setIsSearchVisible,
+    setUseTodayDate,
+    currentDateText,
+    totalCount,
+    completedCount,
+    progressPercent,
+    openAddModal,
+    openThemeModal,
+    handleLoadFromApi,
+    handleClearAll,
+    handleToggle,
+    handleDelete,
+  } = useTodoContext();
 
-  // Dynamic Theme State
-  const [activePaletteId, setActivePaletteId] = useState<MaterialYouPaletteId>('ocean');
-  const currentTheme = MATERIAL_YOU_PALETTES[activePaletteId];
-  const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
+  const meta = FILTER_META[filter];
 
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const [activeTab, setActiveTab] = useState<TabType>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchVisible, setIsSearchVisible] = useState(false);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-
-  // Date toggle (mock date vs today)
-  const [useTodayDate, setUseTodayDate] = useState(false);
-  const currentDateText = useTodayDate ? getFormattedDate() : '4th March 2018';
-
-  // Animation states
   const [fabScale] = useState(() => new Animated.Value(1));
   const [progressAnim] = useState(() => new Animated.Value(0));
   const [pulseAnim] = useState(() => new Animated.Value(1));
 
-  // Pulsing animation for empty state
+  const filteredTodos = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return todos.filter((item) => {
+      if (filter === 'pending' && item.completed) return false;
+      if (filter === 'completed' && !item.completed) return false;
+      if (query.length > 0) {
+        return item.todo.toLowerCase().includes(query);
+      }
+      return true;
+    });
+  }, [todos, filter, searchQuery]);
+
   useEffect(() => {
-    if (todos.length === 0) {
+    if (filteredTodos.length === 0) {
       const loop = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -108,13 +125,7 @@ function MainScreen() {
       loop.start();
       return () => loop.stop();
     }
-  }, [todos.length, pulseAnim]);
-
-  // Animate progress bar when todos change
-  const totalCount = todos.length;
-  const completedCount = todos.filter((t) => t.completed).length;
-  const pendingCount = totalCount - completedCount;
-  const progressPercent = totalCount > 0 ? completedCount / totalCount : 0;
+  }, [filteredTodos.length, pulseAnim]);
 
   useEffect(() => {
     Animated.spring(progressAnim, {
@@ -125,112 +136,6 @@ function MainScreen() {
     }).start();
   }, [progressPercent, progressAnim]);
 
-  // Load from DummyJSON API
-  const handleLoadFromApi = useCallback(async (isRefresh = false) => {
-    try {
-      triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-      if (isRefresh) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-      const data = await fetchTodos(30, 0);
-      setTodos(data.todos);
-      triggerNotificationHaptic(Haptics.NotificationFeedbackType.Success);
-    } catch (err) {
-      Alert.alert('Помилка', 'Не вдалося завантажити завдання із сервера');
-      console.error(err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  // Clear entire list
-  const handleClearAll = useCallback(() => {
-    if (todos.length === 0) return;
-    triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
-    Alert.alert(
-      'Очистити список',
-      'Видалити всі завдання зі списку?',
-      [
-        { text: 'Скасувати', style: 'cancel' },
-        {
-          text: 'Видалити всі',
-          style: 'destructive',
-          onPress: () => {
-            triggerNotificationHaptic(Haptics.NotificationFeedbackType.Warning);
-            setTodos([]);
-          },
-        },
-      ]
-    );
-  }, [todos.length]);
-
-  const handleToggle = useCallback(async (id: number) => {
-    setTodos((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              completed: !item.completed,
-              status: !item.completed ? 'done' : 'to-do',
-            }
-          : item
-      )
-    );
-    const target = todos.find((t) => t.id === id);
-    if (target) {
-      await toggleTodoApi(id, !target.completed);
-    }
-  }, [todos]);
-
-  const handleDelete = useCallback(async (id: number) => {
-    setTodos((prev) => prev.filter((item) => item.id !== id));
-    await deleteTodoApi(id);
-  }, []);
-
-  // React Hook Form submission handler
-  const handleAddTodo = useCallback(async (formData: TodoFormData) => {
-    const tempId = Date.now();
-    const taskStatus = formData.status || 'to-do';
-    const isCompleted = taskStatus === 'done';
-    const newTodo: Todo = {
-      id: tempId,
-      todo: formData.title,
-      completed: isCompleted,
-      status: taskStatus,
-      date: formData.date,
-      priority: formData.priority,
-      userId: 1,
-      time: '12 pm',
-    };
-    setTodos((prev) => [newTodo, ...prev]);
-
-    try {
-      const serverTodo = await addTodoApi(formData);
-      setTodos((prev) =>
-        prev.map((t) => (t.id === tempId ? { ...t, id: serverTodo.id } : t))
-      );
-    } catch (e) {
-      console.warn('Local fallback used for added todo:', e);
-    }
-  }, []);
-
-  // Filtered todos
-  const filteredTodos = useMemo(() => {
-    return todos.filter((item) => {
-      if (activeTab === 'pending' && item.completed) return false;
-      if (activeTab === 'completed' && !item.completed) return false;
-
-      if (searchQuery.trim().length > 0) {
-        return item.todo.toLowerCase().includes(searchQuery.toLowerCase());
-      }
-      return true;
-    });
-  }, [todos, activeTab, searchQuery]);
-
-  // FAB bounce animation
   const handleFabPressIn = () => {
     triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
     Animated.spring(fabScale, {
@@ -257,15 +162,16 @@ function MainScreen() {
 
   return (
     <View style={styles.screen}>
-      <StatusBar style="light" />
-
-      {/* Ambient Mesh Background */}
       <LiquidBackground theme={currentTheme} />
 
-      <View style={[styles.mainContainer, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <View style={[styles.mainContainer, { paddingTop: insets.top }]}>
         {/* Top App Bar */}
         <View style={styles.glassTopBarContainer}>
-          <BlurView intensity={GLASS_TOKENS.blurIntensityHeader} tint="dark" style={StyleSheet.absoluteFill} />
+          <BlurView
+            intensity={GLASS_TOKENS.blurIntensityHeader}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+          />
           <LinearGradient
             colors={GLASS_TOKENS.sheenGradientSubtle}
             start={{ x: 0, y: 0 }}
@@ -276,7 +182,24 @@ function MainScreen() {
           <View style={styles.topAppBar}>
             <View style={styles.titleArea}>
               <View style={styles.appTitleRow}>
-                <Text style={styles.appTitle}>ToDo List</Text>
+                <Text style={styles.appTitle}>{meta.headerTitle}</Text>
+                {filter !== 'all' && (
+                  <View
+                    style={[
+                      styles.glassBadge,
+                      { borderColor: `${currentTheme.primary}60` },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.glassBadgeText,
+                        { color: currentTheme.primary },
+                      ]}
+                    >
+                      {filteredTodos.length}
+                    </Text>
+                  </View>
+                )}
               </View>
 
               <TouchableOpacity
@@ -287,20 +210,32 @@ function MainScreen() {
                 }}
                 activeOpacity={0.7}
               >
-                <Feather name="calendar" size={12} color={currentTheme.primary} style={{ marginRight: 6 }} />
+                <Feather
+                  name="calendar"
+                  size={12}
+                  color={currentTheme.primary}
+                  style={{ marginRight: 6 }}
+                />
                 <Text style={styles.dateText}>{currentDateText}</Text>
-                <Feather name="repeat" size={10} color="#7E8497" style={{ marginLeft: 5 }} />
+                <Feather
+                  name="repeat"
+                  size={10}
+                  color="#7E8497"
+                  style={{ marginLeft: 5 }}
+                />
               </TouchableOpacity>
             </View>
 
             {/* Top Action Buttons */}
             <View style={styles.actionsRow}>
-              {/* Theme Swatch Button */}
               <TouchableOpacity
-                style={[styles.glassIconBtn, { borderColor: `${currentTheme.primary}60` }]}
+                style={[
+                  styles.glassIconBtn,
+                  { borderColor: `${currentTheme.primary}60` },
+                ]}
                 onPress={() => {
                   triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-                  setIsThemeModalOpen(true);
+                  openThemeModal();
                 }}
                 activeOpacity={0.75}
               >
@@ -308,13 +243,22 @@ function MainScreen() {
                   colors={currentTheme.accentGradient}
                   style={styles.themeSwatchSmall}
                 >
-                  <Feather name="droplet" size={12} color={currentTheme.onPrimary} />
+                  <Feather
+                    name="droplet"
+                    size={12}
+                    color={currentTheme.onPrimary}
+                  />
                 </LinearGradient>
               </TouchableOpacity>
 
-              {/* Search Toggle Button */}
               <TouchableOpacity
-                style={[styles.glassIconBtn, isSearchVisible && [styles.iconBtnActive, { borderColor: currentTheme.primary }]]}
+                style={[
+                  styles.glassIconBtn,
+                  isSearchVisible && [
+                    styles.iconBtnActive,
+                    { borderColor: currentTheme.primary },
+                  ],
+                ]}
                 onPress={() => {
                   triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
                   setIsSearchVisible((v) => !v);
@@ -329,16 +273,18 @@ function MainScreen() {
                 />
               </TouchableOpacity>
 
-              {/* DummyJSON Sync Button */}
               <TouchableOpacity
                 style={styles.glassIconBtn}
                 onPress={() => handleLoadFromApi(false)}
                 activeOpacity={0.7}
               >
-                <Feather name="download-cloud" size={16} color={currentTheme.primary} />
+                <Feather
+                  name="download-cloud"
+                  size={16}
+                  color={currentTheme.primary}
+                />
               </TouchableOpacity>
 
-              {/* Clear All Button */}
               {todos.length > 0 && (
                 <TouchableOpacity
                   style={[styles.glassIconBtn, styles.iconBtnDanger]}
@@ -356,18 +302,38 @@ function MainScreen() {
         {totalCount > 0 && (
           <View style={styles.progressSection}>
             <View style={styles.glassProgressCard}>
-              <BlurView intensity={35} tint="dark" style={StyleSheet.absoluteFill} />
+              <BlurView
+                intensity={35}
+                tint="dark"
+                style={StyleSheet.absoluteFill}
+              />
               <View style={styles.progressHeader}>
                 <View style={styles.progressLabelGroup}>
-                  <Feather name="activity" size={12} color={currentTheme.primary} style={{ marginRight: 6 }} />
+                  <Feather
+                    name="activity"
+                    size={12}
+                    color={currentTheme.primary}
+                    style={{ marginRight: 6 }}
+                  />
                   <Text style={styles.progressLabel}>Прогрес виконання</Text>
                 </View>
-                <Text style={[styles.progressCount, { color: currentTheme.primary }]}>
-                  {completedCount} з {totalCount} ({Math.round(progressPercent * 100)}%)
+                <Text
+                  style={[
+                    styles.progressCount,
+                    { color: currentTheme.primary },
+                  ]}
+                >
+                  {completedCount} з {totalCount} (
+                  {Math.round(progressPercent * 100)}%)
                 </Text>
               </View>
               <View style={styles.progressBarTrack}>
-                <Animated.View style={[styles.progressBarFill, { width: progressInterpolated }]}>
+                <Animated.View
+                  style={[
+                    styles.progressBarFill,
+                    { width: progressInterpolated },
+                  ]}
+                >
                   <LinearGradient
                     colors={currentTheme.accentGradient}
                     start={{ x: 0, y: 0 }}
@@ -384,8 +350,17 @@ function MainScreen() {
         {isSearchVisible && (
           <View style={styles.searchSection}>
             <View style={styles.glassSearchContainer}>
-              <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} />
-              <Feather name="search" size={16} color={currentTheme.primary} style={styles.searchIcon} />
+              <BlurView
+                intensity={45}
+                tint="dark"
+                style={StyleSheet.absoluteFill}
+              />
+              <Feather
+                name="search"
+                size={16}
+                color={currentTheme.primary}
+                style={styles.searchIcon}
+              />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Швидкий пошук завдань..."
@@ -409,140 +384,29 @@ function MainScreen() {
           </View>
         )}
 
-        {/* Filter Chips */}
-        <View style={styles.filterRow}>
-          <TouchableOpacity
-            style={[
-              styles.glassChip,
-              activeTab === 'all' && [
-                styles.chipActive,
-                { borderColor: currentTheme.primary, backgroundColor: `${currentTheme.primary}18` },
-              ],
-            ]}
-            onPress={() => {
-              triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-              setActiveTab('all');
-            }}
-            activeOpacity={0.75}
-          >
-            <Feather
-              name="layers"
-              size={13}
-              color={activeTab === 'all' ? currentTheme.primary : '#7E8497'}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={[styles.chipText, activeTab === 'all' && { color: currentTheme.primary, fontWeight: '800' }]}>
-              Всі
-            </Text>
-            <View
-              style={[
-                styles.chipBadge,
-                activeTab === 'all' && { backgroundColor: currentTheme.primary },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.chipBadgeText,
-                  activeTab === 'all' && { color: currentTheme.onPrimary, fontWeight: '800' },
-                ]}
-              >
-                {totalCount}
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.glassChip,
-              activeTab === 'pending' && [
-                styles.chipActive,
-                { borderColor: currentTheme.primary, backgroundColor: `${currentTheme.primary}18` },
-              ],
-            ]}
-            onPress={() => {
-              triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-              setActiveTab('pending');
-            }}
-            activeOpacity={0.75}
-          >
-            <Feather
-              name="clock"
-              size={13}
-              color={activeTab === 'pending' ? currentTheme.primary : '#7E8497'}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={[styles.chipText, activeTab === 'pending' && { color: currentTheme.primary, fontWeight: '800' }]}>
-              to-do
-            </Text>
-            <View
-              style={[
-                styles.chipBadge,
-                activeTab === 'pending' && { backgroundColor: currentTheme.primary },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.chipBadgeText,
-                  activeTab === 'pending' && { color: currentTheme.onPrimary, fontWeight: '800' },
-                ]}
-              >
-                {pendingCount}
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.glassChip,
-              activeTab === 'completed' && [
-                styles.chipActive,
-                { borderColor: COLORS.success, backgroundColor: 'rgba(105, 226, 168, 0.18)' },
-              ],
-            ]}
-            onPress={() => {
-              triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-              setActiveTab('completed');
-            }}
-            activeOpacity={0.75}
-          >
-            <Feather
-              name="check-circle"
-              size={13}
-              color={activeTab === 'completed' ? COLORS.success : '#7E8497'}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={[styles.chipText, activeTab === 'completed' && { color: COLORS.success, fontWeight: '800' }]}>
-              done
-            </Text>
-            <View
-              style={[
-                styles.chipBadge,
-                activeTab === 'completed' && { backgroundColor: COLORS.success },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.chipBadgeText,
-                  activeTab === 'completed' && { color: '#003920', fontWeight: '800' },
-                ]}
-              >
-                {completedCount}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
         {/* Main FlatList Area */}
         <View style={styles.listArea}>
           {loading ? (
             <View style={styles.centerContainer}>
               <View style={styles.loadingGlassCard}>
-                <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+                <BlurView
+                  intensity={50}
+                  tint="dark"
+                  style={StyleSheet.absoluteFill}
+                />
                 <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-                  <Feather name="loader" size={36} color={currentTheme.primary} />
+                  <Feather
+                    name="loader"
+                    size={36}
+                    color={currentTheme.primary}
+                  />
                 </Animated.View>
-                <Text style={styles.loadingTitle}>Завантаження з DummyJSON...</Text>
-                <Text style={styles.loadingSubtitle}>Синхронізація завдань у скляному інтерфейсі</Text>
+                <Text style={styles.loadingTitle}>
+                  Завантаження з DummyJSON...
+                </Text>
+                <Text style={styles.loadingSubtitle}>
+                  Синхронізація завдань у скляному інтерфейсі
+                </Text>
               </View>
             </View>
           ) : (
@@ -557,7 +421,10 @@ function MainScreen() {
                   theme={currentTheme}
                 />
               )}
-              contentContainerStyle={styles.listContent}
+              contentContainerStyle={[
+                styles.listContent,
+                { paddingBottom: tabBarHeight + 92 },
+              ]}
               showsVerticalScrollIndicator={false}
               refreshControl={
                 <RefreshControl
@@ -570,7 +437,11 @@ function MainScreen() {
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
                   <View style={styles.emptyGlassCard}>
-                    <BlurView intensity={55} tint="dark" style={StyleSheet.absoluteFill} />
+                    <BlurView
+                      intensity={55}
+                      tint="dark"
+                      style={StyleSheet.absoluteFill}
+                    />
                     <LinearGradient
                       colors={GLASS_TOKENS.sheenGradientSubtle}
                       start={{ x: 0, y: 0 }}
@@ -581,18 +452,25 @@ function MainScreen() {
                     <Animated.View
                       style={[
                         styles.emptyIconCircle,
-                        { borderColor: `${currentTheme.primary}40`, backgroundColor: `${currentTheme.primary}15` },
+                        {
+                          borderColor: `${currentTheme.primary}40`,
+                          backgroundColor: `${currentTheme.primary}15`,
+                        },
                         { transform: [{ scale: pulseAnim }] },
                       ]}
                     >
-                      <Feather name="check" size={36} color={currentTheme.primary} />
+                      <Feather
+                        name={meta.emptyIcon}
+                        size={36}
+                        color={currentTheme.primary}
+                      />
                     </Animated.View>
 
-                    <Text style={styles.emptyTitle}>Список завдань порожній</Text>
+                    <Text style={styles.emptyTitle}>{meta.emptyTitle}</Text>
                     <Text style={styles.emptySubtitle}>
                       {searchQuery
                         ? 'За запитом нічого не знайдено'
-                        : 'Створіть нове завдання через форму з React Hook Form або завантажте з DummyJSON'}
+                        : meta.emptySubtitle}
                     </Text>
 
                     <View style={styles.emptyBtnGroup}>
@@ -600,7 +478,7 @@ function MainScreen() {
                         style={styles.emptyPrimaryBtn}
                         onPress={() => {
                           triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-                          setIsAddModalOpen(true);
+                          openAddModal();
                         }}
                         activeOpacity={0.85}
                       >
@@ -610,8 +488,18 @@ function MainScreen() {
                           end={{ x: 1, y: 1 }}
                           style={styles.emptyPrimaryBtnGradient}
                         >
-                          <Feather name="plus-circle" size={17} color={currentTheme.onPrimary} style={{ marginRight: 8 }} />
-                          <Text style={[styles.emptyPrimaryBtnText, { color: currentTheme.onPrimary }]}>
+                          <Feather
+                            name="plus-circle"
+                            size={17}
+                            color={currentTheme.onPrimary}
+                            style={{ marginRight: 8 }}
+                          />
+                          <Text
+                            style={[
+                              styles.emptyPrimaryBtnText,
+                              { color: currentTheme.onPrimary },
+                            ]}
+                          >
                             Створити завдання (Форма)
                           </Text>
                         </LinearGradient>
@@ -622,8 +510,18 @@ function MainScreen() {
                         onPress={() => handleLoadFromApi(false)}
                         activeOpacity={0.8}
                       >
-                        <Feather name="download-cloud" size={17} color={currentTheme.primary} style={{ marginRight: 8 }} />
-                        <Text style={[styles.emptySecondaryBtnText, { color: currentTheme.primary }]}>
+                        <Feather
+                          name="download-cloud"
+                          size={17}
+                          color={currentTheme.primary}
+                          style={{ marginRight: 8 }}
+                        />
+                        <Text
+                          style={[
+                            styles.emptySecondaryBtnText,
+                            { color: currentTheme.primary },
+                          ]}
+                        >
                           Завантажити з DummyJSON
                         </Text>
                       </TouchableOpacity>
@@ -635,13 +533,21 @@ function MainScreen() {
           )}
         </View>
 
-        {/* FAB with Spring Bounce & Multi-Layer Glow */}
-        <Animated.View style={[styles.fabContainer, { transform: [{ scale: fabScale }] }]}>
+        {/* FAB positioned cleanly above the bottom tab bar */}
+        <Animated.View
+          style={[
+            styles.fabContainer,
+            {
+              bottom: tabBarHeight + 16,
+              transform: [{ scale: fabScale }],
+            },
+          ]}
+        >
           <TouchableOpacity
             style={styles.fab}
             onPress={() => {
               triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
-              setIsAddModalOpen(true);
+              openAddModal();
             }}
             onPressIn={handleFabPressIn}
             onPressOut={handleFabPressOut}
@@ -657,34 +563,10 @@ function MainScreen() {
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
-
-        {/* Modal 1: React Hook Form Task Creation Modal */}
-        <AddTodoModal
-          visible={isAddModalOpen}
-          onClose={() => setIsAddModalOpen(false)}
-          onAdd={handleAddTodo}
-          theme={currentTheme}
-        />
-
-        {/* Modal 2: Dynamic Palette Selector */}
-        <ThemeSelectorModal
-          visible={isThemeModalOpen}
-          activePaletteId={activePaletteId}
-          onSelectPalette={setActivePaletteId}
-          onClose={() => setIsThemeModalOpen(false)}
-        />
       </View>
     </View>
   );
-}
-
-export default function App() {
-  return (
-    <SafeAreaProvider>
-      <MainScreen />
-    </SafeAreaProvider>
-  );
-}
+};
 
 const styles = StyleSheet.create({
   screen: {
@@ -733,14 +615,14 @@ const styles = StyleSheet.create({
     letterSpacing: -0.6,
   },
   glassBadge: {
-    paddingHorizontal: 7,
+    paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
   },
   glassBadgeText: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
@@ -836,6 +718,7 @@ const styles = StyleSheet.create({
   searchSection: {
     paddingHorizontal: 16,
     paddingTop: 4,
+    paddingBottom: 4,
   },
   glassSearchContainer: {
     flexDirection: 'row',
@@ -860,48 +743,11 @@ const styles = StyleSheet.create({
   clearBtn: {
     padding: 4,
   },
-  filterRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  glassChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 14,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1.2,
-    borderColor: 'rgba(255, 255, 255, 0.10)',
-  },
-  chipActive: {
-    borderWidth: 1.5,
-  },
-  chipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#7E8497',
-  },
-  chipBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginLeft: 6,
-  },
-  chipBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#7E8497',
-  },
   listArea: {
     flex: 1,
   },
   listContent: {
-    paddingTop: 4,
-    paddingBottom: 95,
+    paddingTop: 6,
   },
   centerContainer: {
     flex: 1,
@@ -1001,7 +847,6 @@ const styles = StyleSheet.create({
   fabContainer: {
     position: 'absolute',
     right: 20,
-    bottom: 24,
   },
   fab: {
     width: 60,

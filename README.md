@@ -7,9 +7,10 @@
 ## 📸 Скріншоти застосунку / Screenshots
 
 <p align="center">
-  <img src="./Screenshots/Screenshot1.png" width="30%" alt="Головний екран списку завдань" />
-  <img src="./Screenshots/Screenshot2.png" width="30%" alt="Форма додавання завдання (React Hook Form)" />
-  <img src="./Screenshots/Screenshot3.png" width="30%" alt="Швидкий пошук та фільтрація" />
+  <img src="./Screenshots/Screenshot1.png" width="23%" alt="Вкладка Всі" />
+  <img src="./Screenshots/Screenshot2.png" width="23%" alt="Вкладка В роботі" />
+  <img src="./Screenshots/Screenshot3.png" width="23%" alt="Вкладка Виконані" />
+  <img src="./Screenshots/Screenshot4.png" width="23%" alt="Вкладка Профіль" />
 </p>
 
 ---
