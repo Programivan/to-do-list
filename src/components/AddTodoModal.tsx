@@ -12,14 +12,20 @@ import {
   TextInput,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+
 import { Priority, TodoFormData } from '../types/todo';
-import { COLORS } from '../constants/theme';
+import { COLORS, GLASS_TOKENS, MaterialYouPalette } from '../constants/theme';
+import { triggerHaptic, triggerNotificationHaptic } from '../utils/haptics';
 
 interface AddTodoModalProps {
   visible: boolean;
   onClose: () => void;
   onAdd: (data: TodoFormData) => void;
+  theme: MaterialYouPalette;
 }
 
 function getTodayString(): string {
@@ -43,30 +49,41 @@ function getTomorrowString(): string {
   return `${day} ${months[d.getMonth()]}`;
 }
 
-const PRIORITIES: { key: Priority; label: string; icon: string; bg: string; border: string; text: string }[] = [
+function getDayAfterTomorrowString(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 2);
+  const day = d.getDate();
+  const months = [
+    'Січ', 'Лют', 'Бер', 'Кві', 'Тра', 'Чер',
+    'Лип', 'Сер', 'Вер', 'Жов', 'Лис', 'Гру',
+  ];
+  return `${day} ${months[d.getMonth()]}`;
+}
+
+const PRIORITIES: { key: Priority; label: string; icon: any; bg: string; border: string; text: string }[] = [
   {
     key: 'high',
     label: 'Високий (High)',
     icon: 'alert-triangle',
-    bg: COLORS.priorityHighBg,
-    border: COLORS.priorityHighBorder,
-    text: COLORS.priorityHighText,
+    bg: 'rgba(120, 24, 30, 0.45)',
+    border: 'rgba(255, 120, 120, 0.50)',
+    text: '#FFA4A2',
   },
   {
     key: 'medium',
     label: 'Середній (Med)',
     icon: 'clock',
-    bg: COLORS.priorityMedBg,
-    border: COLORS.priorityMedBorder,
-    text: COLORS.priorityMedText,
+    bg: 'rgba(110, 65, 15, 0.45)',
+    border: 'rgba(255, 195, 100, 0.50)',
+    text: '#FFCF87',
   },
   {
     key: 'low',
     label: 'Низький (Low)',
     icon: 'arrow-down',
-    bg: COLORS.priorityLowBg,
-    border: COLORS.priorityLowBorder,
-    text: COLORS.priorityLowText,
+    bg: 'rgba(20, 70, 110, 0.45)',
+    border: 'rgba(130, 205, 255, 0.50)',
+    text: '#82D0FF',
   },
 ];
 
@@ -74,11 +91,12 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
   visible,
   onClose,
   onAdd,
+  theme,
 }) => {
-  const [slideAnim] = useState(() => new Animated.Value(400));
+  const [slideAnim] = useState(() => new Animated.Value(450));
   const [fadeAnim] = useState(() => new Animated.Value(0));
 
-  // React Hook Form initialization
+  // React Hook Form
   const {
     control,
     handleSubmit,
@@ -89,6 +107,7 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
       title: '',
       date: getTodayString(),
       priority: 'medium',
+      status: 'to-do',
     },
     mode: 'onChange',
   });
@@ -99,27 +118,29 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
         title: '',
         date: getTodayString(),
         priority: 'medium',
+        status: 'to-do',
       });
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 200,
+          duration: 220,
           useNativeDriver: true,
         }),
         Animated.spring(slideAnim, {
           toValue: 0,
           friction: 8,
-          tension: 140,
+          tension: 130,
           useNativeDriver: true,
         }),
       ]).start();
     } else {
-      slideAnim.setValue(400);
+      slideAnim.setValue(450);
       fadeAnim.setValue(0);
     }
   }, [visible, slideAnim, fadeAnim, reset]);
 
   const onSubmit = (data: TodoFormData) => {
+    triggerNotificationHaptic(Haptics.NotificationFeedbackType.Success);
     onAdd(data);
     onClose();
   };
@@ -135,36 +156,65 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
         style={styles.overlay}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+        {/* Real Frosted Glass Backdrop */}
         <Animated.View style={[styles.backdrop, { opacity: fadeAnim }]}>
+          <BlurView intensity={GLASS_TOKENS.blurIntensityHeader} tint="dark" style={StyleSheet.absoluteFill} />
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
             activeOpacity={1}
-            onPress={onClose}
+            onPress={() => {
+              triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+              onClose();
+            }}
           />
         </Animated.View>
 
+        {/* Liquid Glass Modal Bottom Sheet */}
         <Animated.View
           style={[
             styles.sheet,
             { transform: [{ translateY: slideAnim }] },
           ]}
         >
+          {/* Frosted Glass Surface Blur */}
+          <BlurView intensity={GLASS_TOKENS.blurIntensityModal} tint="dark" style={StyleSheet.absoluteFill} />
+
+          {/* Specular Refraction Highlight Line */}
+          <LinearGradient
+            colors={GLASS_TOKENS.sheenGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.specularLine}
+          />
+
           {/* Drag Handle */}
           <View style={styles.dragHandle} />
 
           {/* Header */}
           <View style={styles.header}>
-            <View>
-              <Text style={styles.title}>Нове завдання</Text>
-              <Text style={styles.subtitle}>React Hook Form • Material 3</Text>
+            <View style={styles.headerTitleGroup}>
+              <View style={[styles.modalIconBadge, { backgroundColor: theme.primaryContainer }]}>
+                <Feather name="plus-circle" size={18} color={theme.primary} />
+              </View>
+              <View>
+                <Text style={styles.title}>Нове завдання</Text>
+                <Text style={styles.subtitle}>React Hook Form • Рідке Скло & M3</Text>
+              </View>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Feather name="x" size={20} color={COLORS.textMuted} />
+            <TouchableOpacity
+              onPress={() => {
+                triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                onClose();
+              }}
+              style={styles.closeBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Feather name="x" size={18} color="#A3A7B5" />
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {/* 1. ПОЛЕ: НАЗВА */}
+          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {/* 1. ПОЛЕ: НАЗВА (React Hook Form) */}
             <Text style={styles.label}>Назва завдання *</Text>
             <Controller
               control={control}
@@ -179,20 +229,20 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
               render={({ field: { onChange, onBlur, value } }) => (
                 <View
                   style={[
-                    styles.inputContainer,
+                    styles.glassInputContainer,
                     errors.title && styles.inputErrorBorder,
                   ]}
                 >
                   <Feather
                     name="edit-3"
-                    size={18}
-                    color={errors.title ? COLORS.danger : COLORS.primary}
+                    size={17}
+                    color={errors.title ? COLORS.danger : theme.primary}
                     style={styles.inputIcon}
                   />
                   <TextInput
                     style={styles.textInput}
                     placeholder="Наприклад: Підготувати звіт"
-                    placeholderTextColor={COLORS.textMuted}
+                    placeholderTextColor="#6A6F80"
                     value={value}
                     onBlur={onBlur}
                     onChangeText={onChange}
@@ -208,7 +258,7 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
               </View>
             )}
 
-            {/* 2. ПОЛЕ: ДАТА */}
+            {/* 2. ПОЛЕ: ДАТА (React Hook Form) */}
             <Text style={[styles.label, { marginTop: 14 }]}>Дата виконання *</Text>
             <Controller
               control={control}
@@ -218,39 +268,45 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
                 <View>
                   <View
                     style={[
-                      styles.inputContainer,
+                      styles.glassInputContainer,
                       errors.date && styles.inputErrorBorder,
                     ]}
                   >
                     <Feather
                       name="calendar"
-                      size={18}
-                      color={COLORS.primary}
+                      size={17}
+                      color={theme.primary}
                       style={styles.inputIcon}
                     />
                     <TextInput
                       style={styles.textInput}
-                      placeholder="Введіть дату або оберіть нижче"
-                      placeholderTextColor={COLORS.textMuted}
+                      placeholder="Введіть дату або оберіть пресет"
+                      placeholderTextColor="#6A6F80"
                       value={value}
                       onBlur={onBlur}
                       onChangeText={onChange}
                     />
                   </View>
 
-                  {/* Швидкі пресети дати */}
+                  {/* Liquid Glass Date Presets */}
                   <View style={styles.datePresets}>
                     <TouchableOpacity
                       style={[
                         styles.dateChip,
-                        value === getTodayString() && styles.dateChipActive,
+                        value === getTodayString() && [
+                          styles.dateChipActive,
+                          { borderColor: theme.primary, backgroundColor: `${theme.primary}20` },
+                        ],
                       ]}
-                      onPress={() => onChange(getTodayString())}
+                      onPress={() => {
+                        triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                        onChange(getTodayString());
+                      }}
                     >
                       <Text
                         style={[
                           styles.dateChipText,
-                          value === getTodayString() && styles.dateChipTextActive,
+                          value === getTodayString() && { color: theme.primary, fontWeight: '800' },
                         ]}
                       >
                         Сьогодні ({getTodayString()})
@@ -260,17 +316,46 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
                     <TouchableOpacity
                       style={[
                         styles.dateChip,
-                        value === getTomorrowString() && styles.dateChipActive,
+                        value === getTomorrowString() && [
+                          styles.dateChipActive,
+                          { borderColor: theme.primary, backgroundColor: `${theme.primary}20` },
+                        ],
                       ]}
-                      onPress={() => onChange(getTomorrowString())}
+                      onPress={() => {
+                        triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                        onChange(getTomorrowString());
+                      }}
                     >
                       <Text
                         style={[
                           styles.dateChipText,
-                          value === getTomorrowString() && styles.dateChipTextActive,
+                          value === getTomorrowString() && { color: theme.primary, fontWeight: '800' },
                         ]}
                       >
                         Завтра ({getTomorrowString()})
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.dateChip,
+                        value === getDayAfterTomorrowString() && [
+                          styles.dateChipActive,
+                          { borderColor: theme.primary, backgroundColor: `${theme.primary}20` },
+                        ],
+                      ]}
+                      onPress={() => {
+                        triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                        onChange(getDayAfterTomorrowString());
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.dateChipText,
+                          value === getDayAfterTomorrowString() && { color: theme.primary, fontWeight: '800' },
+                        ]}
+                      >
+                        +{getDayAfterTomorrowString()}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -284,7 +369,7 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
               </View>
             )}
 
-            {/* 3. ПОЛЕ: ПРІОРИТЕТ (low, medium, high) */}
+            {/* 3. ПОЛЕ: ПРІОРИТЕТ (low, medium, high - React Hook Form) */}
             <Text style={[styles.label, { marginTop: 14 }]}>Пріоритет *</Text>
             <Controller
               control={control}
@@ -305,12 +390,15 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
                             borderColor: p.text,
                           },
                         ]}
-                        onPress={() => onChange(p.key)}
+                        onPress={() => {
+                          triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                          onChange(p.key);
+                        }}
                       >
                         <Feather
-                          name={p.icon as any}
-                          size={16}
-                          color={isSelected ? p.text : COLORS.textMuted}
+                          name={p.icon}
+                          size={15}
+                          color={isSelected ? p.text : '#7E8497'}
                         />
                         <Text
                           style={[
@@ -327,11 +415,88 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
               )}
             />
 
-            {/* СТАТУС ІНФОРМАЦІЯ */}
-            <View style={styles.statusInfoBox}>
-              <Feather name="info" size={15} color={COLORS.primary} style={{ marginRight: 8 }} />
+            {/* 4. ПОЛЕ: СТАТУС (done/to-do, за замовчуванням: to-do) */}
+            <Text style={[styles.label, { marginTop: 14 }]}>Статус завдання (done / to-do) *</Text>
+            <Controller
+              control={control}
+              name="status"
+              defaultValue="to-do"
+              render={({ field: { onChange, value } }) => (
+                <View style={styles.statusSegmentContainer}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={[
+                      styles.statusSegmentBtn,
+                      value === 'to-do' && [
+                        styles.statusSegmentActive,
+                        {
+                          backgroundColor: `${theme.primary}22`,
+                          borderColor: theme.primary,
+                        },
+                      ],
+                    ]}
+                    onPress={() => {
+                      triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                      onChange('to-do');
+                    }}
+                  >
+                    <View
+                      style={[
+                        styles.statusDot,
+                        { backgroundColor: value === 'to-do' ? theme.primary : '#7E8497' },
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.statusSegmentText,
+                        value === 'to-do' && { color: theme.primary, fontWeight: '800' },
+                      ]}
+                    >
+                      to-do (в процесі)
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={[
+                      styles.statusSegmentBtn,
+                      value === 'done' && [
+                        styles.statusSegmentActive,
+                        {
+                          backgroundColor: 'rgba(56, 201, 133, 0.22)',
+                          borderColor: '#69E2A8',
+                        },
+                      ],
+                    ]}
+                    onPress={() => {
+                      triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                      onChange('done');
+                    }}
+                  >
+                    <View
+                      style={[
+                        styles.statusDot,
+                        { backgroundColor: value === 'done' ? '#69E2A8' : '#7E8497' },
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.statusSegmentText,
+                        value === 'done' && { color: '#69E2A8', fontWeight: '800' },
+                      ]}
+                    >
+                      done (виконано)
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+
+            {/* Підказка згідно з PDF: статус за замовчуванням to-do */}
+            <View style={[styles.statusInfoBox, { borderColor: `${theme.primary}40`, backgroundColor: `${theme.primary}12` }]}>
+              <Feather name="info" size={14} color={theme.primary} style={{ marginRight: 8 }} />
               <Text style={styles.statusInfoText}>
-                Статус за замовчуванням: <Text style={{ fontWeight: '800', color: COLORS.primary }}>to-do</Text>
+                Статус за замовчуванням встановлено на: <Text style={{ fontWeight: '800', color: theme.primary }}>to-do</Text>
               </Text>
             </View>
 
@@ -339,7 +504,10 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
             <View style={styles.actions}>
               <TouchableOpacity
                 style={styles.cancelBtn}
-                onPress={onClose}
+                onPress={() => {
+                  triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+                  onClose();
+                }}
                 activeOpacity={0.7}
               >
                 <Text style={styles.cancelBtnText}>Скасувати</Text>
@@ -347,11 +515,20 @@ export const AddTodoModal: React.FC<AddTodoModalProps> = ({
 
               <TouchableOpacity
                 style={styles.submitBtn}
-                onPress={() => handleSubmit(onSubmit)()}
+                onPress={() => {
+                  handleSubmit(onSubmit)();
+                }}
                 activeOpacity={0.85}
               >
-                <Feather name="check-circle" size={18} color="#002966" style={{ marginRight: 6 }} />
-                <Text style={styles.submitBtnText}>Зберегти завдання</Text>
+                <LinearGradient
+                  colors={theme.accentGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.submitBtnGradient}
+                >
+                  <Feather name="check" size={18} color={theme.onPrimary} style={{ marginRight: 6 }} />
+                  <Text style={[styles.submitBtnText, { color: theme.onPrimary }]}>Створити завдання</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -368,191 +545,231 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0, 0, 0, 0.78)',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
   sheet: {
-    backgroundColor: COLORS.surfaceDark,
+    backgroundColor: GLASS_TOKENS.modalGlassBg,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
-    paddingHorizontal: 22,
+    paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 36,
-    maxHeight: '90%',
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    maxHeight: '88%',
+    overflow: 'hidden',
     borderWidth: 1.5,
-    borderColor: COLORS.border,
+    borderColor: GLASS_TOKENS.glassBorderHighlight,
+    borderBottomWidth: 0,
+  },
+  specularLine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2,
   },
   dragHandle: {
-    width: 42,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: COLORS.border,
+    width: 44,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
     alignSelf: 'center',
     marginBottom: 16,
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 18,
   },
+  headerTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  modalIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
-    fontSize: 22,
+    fontSize: 19,
     fontWeight: '800',
-    color: COLORS.textLight,
-    letterSpacing: -0.4,
+    color: '#F5F6FA',
+    letterSpacing: -0.3,
   },
   subtitle: {
     fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.primary,
+    color: '#7E8497',
     marginTop: 2,
   },
   closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.cardDark,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   label: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: COLORS.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 8,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#C6CBDA',
+    marginBottom: 6,
+    letterSpacing: 0.2,
   },
-  inputContainer: {
+  glassInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.cardDark,
-    borderRadius: 18,
+    backgroundColor: GLASS_TOKENS.inputGlassBg,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    height: 50,
     borderWidth: 1.5,
-    borderColor: COLORS.border,
-    paddingHorizontal: 16,
-    height: 52,
-  },
-  inputErrorBorder: {
-    borderColor: COLORS.danger,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   inputIcon: {
     marginRight: 10,
   },
   textInput: {
     flex: 1,
-    fontSize: 15,
-    color: COLORS.textLight,
+    fontSize: 14,
+    color: '#F5F6FA',
     fontWeight: '600',
+  },
+  inputErrorBorder: {
+    borderColor: COLORS.danger,
   },
   errorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 6,
-    marginLeft: 4,
+    marginTop: 4,
+    gap: 5,
   },
   errorText: {
     fontSize: 12,
     color: COLORS.danger,
-    fontWeight: '700',
-    marginLeft: 6,
+    fontWeight: '600',
   },
   datePresets: {
     flexDirection: 'row',
-    marginTop: 8,
     gap: 8,
+    marginTop: 8,
+    flexWrap: 'wrap',
   },
   dateChip: {
-    backgroundColor: COLORS.cardDark,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 11,
     borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
   },
-  dateChipActive: {
-    backgroundColor: COLORS.primaryContainer,
-    borderColor: COLORS.primary,
-  },
+  dateChipActive: {},
   dateChipText: {
     fontSize: 12,
-    color: COLORS.textMuted,
     fontWeight: '600',
-  },
-  dateChipTextActive: {
-    color: COLORS.onPrimaryContainer,
-    fontWeight: '800',
+    color: '#7E8497',
   },
   priorityGroup: {
-    flexDirection: 'column',
     gap: 8,
-    marginBottom: 14,
   },
   priorityCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.cardDark,
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1.5,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     gap: 10,
   },
   priorityCardText: {
-    fontSize: 14,
-    color: COLORS.textLight,
+    fontSize: 13,
     fontWeight: '600',
+    color: '#C6CBDA',
+  },
+  statusSegmentContainer: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  statusSegmentBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    gap: 8,
+  },
+  statusSegmentActive: {},
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusSegmentText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#7E8497',
   },
   statusInfoBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0E1729',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    padding: 12,
     borderRadius: 14,
+    marginTop: 16,
     borderWidth: 1,
-    borderColor: '#1D3461',
-    marginBottom: 20,
   },
   statusInfoText: {
-    fontSize: 13,
-    color: COLORS.textLight,
+    fontSize: 12,
+    color: '#C6CBDA',
   },
   actions: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 4,
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 22,
   },
   cancelBtn: {
     flex: 1,
-    backgroundColor: COLORS.cardDark,
-    borderRadius: 20,
-    paddingVertical: 15,
+    paddingVertical: 14,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderWidth: 1.5,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
   },
   cancelBtnText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
-    color: COLORS.textMuted,
+    color: '#C6CBDA',
   },
   submitBtn: {
-    flex: 2,
-    backgroundColor: COLORS.primary,
-    borderRadius: 20,
-    paddingVertical: 15,
+    flex: 1.8,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  submitBtnGradient: {
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   submitBtnText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
-    color: '#002966',
   },
 });

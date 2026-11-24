@@ -17,6 +17,7 @@ export interface TodoFormData {
   title: string;
   date: string;
   priority: Priority;
+  status?: TaskStatus;
 }
 
 export interface TodosResponse {

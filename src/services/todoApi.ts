@@ -32,13 +32,16 @@ export async function fetchTodos(limit: number = 30, skip: number = 0): Promise<
 }
 
 export async function addTodoApi(formData: TodoFormData): Promise<Todo> {
+  const isCompleted = formData.status === 'done';
+  const taskStatus = formData.status || 'to-do';
+
   try {
     const response = await fetch(`${BASE_URL}/add`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         todo: formData.title,
-        completed: false,
+        completed: isCompleted,
         userId: 1,
       }),
     });
@@ -51,8 +54,8 @@ export async function addTodoApi(formData: TodoFormData): Promise<Todo> {
     return {
       id: created.id,
       todo: formData.title,
-      completed: false,
-      status: 'to-do',
+      completed: isCompleted,
+      status: taskStatus,
       date: formData.date,
       priority: formData.priority,
       userId: 1,
@@ -63,8 +66,8 @@ export async function addTodoApi(formData: TodoFormData): Promise<Todo> {
     return {
       id: Date.now(),
       todo: formData.title,
-      completed: false,
-      status: 'to-do',
+      completed: isCompleted,
+      status: taskStatus,
       date: formData.date,
       priority: formData.priority,
       userId: 1,

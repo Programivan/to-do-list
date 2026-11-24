@@ -7,14 +7,20 @@ import {
   Alert,
   Animated,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+
 import { Todo, Priority } from '../types/todo';
-import { COLORS } from '../constants/theme';
+import { COLORS, GLASS_TOKENS, MaterialYouPalette } from '../constants/theme';
+import { triggerHaptic } from '../utils/haptics';
 
 interface TodoItemProps {
   todo: Todo;
   onToggle: (id: number) => void;
   onDelete: (id: number) => void;
+  theme: MaterialYouPalette;
 }
 
 function getPriorityBadgeConfig(priority: Priority = 'medium') {
@@ -22,31 +28,31 @@ function getPriorityBadgeConfig(priority: Priority = 'medium') {
     case 'high':
       return {
         label: 'High',
-        bg: COLORS.priorityHighBg,
-        border: COLORS.priorityHighBorder,
-        text: COLORS.priorityHighText,
-        icon: 'alert-circle',
+        bg: 'rgba(120, 24, 30, 0.45)',
+        border: 'rgba(255, 120, 120, 0.45)',
+        text: '#FFA4A2',
+        icon: 'alert-circle' as const,
       };
     case 'medium':
       return {
         label: 'Med',
-        bg: COLORS.priorityMedBg,
-        border: COLORS.priorityMedBorder,
-        text: COLORS.priorityMedText,
-        icon: 'clock',
+        bg: 'rgba(110, 65, 15, 0.45)',
+        border: 'rgba(255, 195, 100, 0.45)',
+        text: '#FFCF87',
+        icon: 'clock' as const,
       };
     case 'low':
       return {
         label: 'Low',
-        bg: COLORS.priorityLowBg,
-        border: COLORS.priorityLowBorder,
-        text: COLORS.priorityLowText,
-        icon: 'arrow-down',
+        bg: 'rgba(20, 70, 110, 0.45)',
+        border: 'rgba(130, 205, 255, 0.45)',
+        text: '#82D0FF',
+        icon: 'arrow-down' as const,
       };
   }
 }
 
-export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, onDelete }) => {
+export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, onDelete, theme }) => {
   const [cardScale] = useState(() => new Animated.Value(1));
   const [checkScale] = useState(() => new Animated.Value(todo.completed ? 1 : 0.85));
 
@@ -54,7 +60,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
 
   const handlePressIn = () => {
     Animated.spring(cardScale, {
-      toValue: 0.97,
+      toValue: 0.98,
       useNativeDriver: true,
       friction: 8,
       tension: 200,
@@ -71,9 +77,11 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
   };
 
   const handleToggleWithAnimation = () => {
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+
     Animated.sequence([
       Animated.timing(checkScale, {
-        toValue: 1.3,
+        toValue: 1.25,
         duration: 120,
         useNativeDriver: true,
       }),
@@ -89,45 +97,71 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
   };
 
   const handleLongPress = () => {
+    triggerHaptic(Haptics.ImpactFeedbackStyle.Heavy);
     Alert.alert(
       'Видалити завдання?',
       `Видалити "${todo.todo}"?`,
       [
         { text: 'Скасувати', style: 'cancel' },
-        { text: 'Видалити', style: 'destructive', onPress: () => onDelete(todo.id) },
+        {
+          text: 'Видалити',
+          style: 'destructive',
+          onPress: () => {
+            triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+            onDelete(todo.id);
+          },
+        },
       ]
     );
   };
 
   return (
-    <Animated.View style={{ transform: [{ scale: cardScale }] }}>
+    <Animated.View style={[styles.wrapper, { transform: [{ scale: cardScale }] }]}>
       <TouchableOpacity
-        activeOpacity={1}
+        activeOpacity={0.92}
         onPress={handleToggleWithAnimation}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         onLongPress={handleLongPress}
         style={[
-          styles.card,
-          todo.completed && styles.cardCompleted,
+          styles.glassCard,
+          todo.completed ? styles.glassCardCompleted : styles.glassCardActive,
         ]}
       >
+        {/* Real Frosted Glass Blur */}
+        <BlurView
+          intensity={GLASS_TOKENS.blurIntensityCard}
+          tint="dark"
+          style={StyleSheet.absoluteFill}
+        />
+
+        {/* Specular Top Edge Refraction Line (Liquid Glass Shine) */}
+        <LinearGradient
+          colors={todo.completed ? GLASS_TOKENS.sheenGradientSubtle : GLASS_TOKENS.sheenGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.specularLine}
+        />
+
         <View style={styles.topRow}>
-          {/* Checkbox & Title */}
+          {/* Frosted Glass Checkbox with Material You Accent */}
           <Animated.View
             style={[
               styles.checkboxContainer,
-              todo.completed ? styles.checkboxCompleted : styles.checkboxIncomplete,
+              todo.completed
+                ? [styles.checkboxCompleted, { backgroundColor: theme.primary, borderColor: theme.primary }]
+                : styles.checkboxIncomplete,
               { transform: [{ scale: checkScale }] },
             ]}
           >
             {todo.completed ? (
-              <Feather name="check" size={14} color="#00391C" />
+              <Feather name="check" size={13} color={theme.onPrimary} />
             ) : (
-              <View style={styles.emptyDot} />
+              <View style={[styles.emptyDot, { borderColor: theme.primary }]} />
             )}
           </Animated.View>
 
+          {/* Task Title */}
           <Text
             style={[
               styles.todoText,
@@ -138,19 +172,23 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
             {todo.todo}
           </Text>
 
+          {/* Delete Action Button */}
           <TouchableOpacity
-            onPress={() => onDelete(todo.id)}
+            onPress={() => {
+              triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
+              onDelete(todo.id);
+            }}
             style={styles.deleteButton}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Feather name="trash-2" size={16} color={COLORS.textMuted} />
+            <Feather name="trash-2" size={15} color={COLORS.textMuted} />
           </TouchableOpacity>
         </View>
 
-        {/* Bottom meta row: Priority, Date, Status */}
+        {/* Meta row: Priority Badge, Date Badge, Status Pill */}
         <View style={styles.metaRow}>
           <View style={styles.metaLeft}>
-            {/* Priority Badge */}
+            {/* Liquid Glass Priority Badge */}
             <View
               style={[
                 styles.badge,
@@ -158,7 +196,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
               ]}
             >
               <Feather
-                name={priorityConfig.icon as any}
+                name={priorityConfig.icon}
                 size={11}
                 color={priorityConfig.text}
                 style={{ marginRight: 4 }}
@@ -168,18 +206,38 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
               </Text>
             </View>
 
-            {/* Date Badge */}
+            {/* Liquid Glass Date Badge */}
             {todo.date ? (
               <View style={styles.dateBadge}>
-                <Feather name="calendar" size={11} color={COLORS.primary} style={{ marginRight: 4 }} />
+                <Feather name="calendar" size={11} color={theme.primary} style={{ marginRight: 4 }} />
                 <Text style={styles.dateBadgeText}>{todo.date}</Text>
               </View>
             ) : null}
           </View>
 
-          {/* Status pill: done / to-do */}
-          <View style={[styles.statusPill, todo.completed ? styles.statusPillDone : styles.statusPillTodo]}>
-            <Text style={[styles.statusPillText, todo.completed ? styles.statusTextDone : styles.statusTextTodo]}>
+          {/* Frosted Glass Status Pill (done / to-do) */}
+          <View
+            style={[
+              styles.statusPill,
+              todo.completed
+                ? styles.statusPillDone
+                : [styles.statusPillTodo, { borderColor: `${theme.primary}55`, backgroundColor: theme.primaryContainer }],
+            ]}
+          >
+            <View
+              style={[
+                styles.statusDot,
+                { backgroundColor: todo.completed ? COLORS.success : theme.primary },
+              ]}
+            />
+            <Text
+              style={[
+                styles.statusPillText,
+                todo.completed
+                  ? styles.statusTextDone
+                  : { color: theme.onPrimaryContainer },
+              ]}
+            >
               {todo.status || (todo.completed ? 'done' : 'to-do')}
             </Text>
           </View>
@@ -192,19 +250,37 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
 TodoItem.displayName = 'TodoItem';
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.cardDark,
+  wrapper: {
+    marginHorizontal: 16,
+    marginVertical: 5,
+  },
+  glassCard: {
     borderRadius: 22,
     paddingVertical: 14,
     paddingHorizontal: 16,
-    marginHorizontal: 16,
-    marginVertical: 5,
+    overflow: 'hidden',
     borderWidth: 1.5,
-    borderColor: COLORS.cardBorder,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  cardCompleted: {
-    backgroundColor: COLORS.cardCompleted,
-    borderColor: COLORS.cardBorderCompleted,
+  glassCardActive: {
+    backgroundColor: GLASS_TOKENS.cardGlassBg,
+    borderColor: GLASS_TOKENS.glassBorderHighlight,
+  },
+  glassCardCompleted: {
+    backgroundColor: GLASS_TOKENS.cardGlassCompletedBg,
+    borderColor: GLASS_TOKENS.glassBorderCompleted,
+    opacity: 0.78,
+  },
+  specularLine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1.5,
   },
   topRow: {
     flexDirection: 'row',
@@ -212,49 +288,55 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   checkboxContainer: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
-  },
-  checkboxCompleted: {
-    backgroundColor: COLORS.success,
+    borderWidth: 1.5,
   },
   checkboxIncomplete: {
-    borderWidth: 2,
-    borderColor: COLORS.border,
-    backgroundColor: 'transparent',
+    borderColor: 'rgba(255, 255, 255, 0.28)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  checkboxCompleted: {
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 4,
+    elevation: 3,
   },
   emptyDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: 'transparent',
+    borderWidth: 1,
+    opacity: 0.4,
   },
   todoText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.textLight,
     flex: 1,
-    lineHeight: 21,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#F5F6FA',
+    lineHeight: 20,
     letterSpacing: -0.2,
   },
   todoTextCompleted: {
     textDecorationLine: 'line-through',
-    color: COLORS.textMuted,
-    fontWeight: '500',
+    color: '#7E8497',
+    fontWeight: '400',
   },
   deleteButton: {
     padding: 6,
-    marginLeft: 8,
+    marginLeft: 6,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingLeft: 38,
+    paddingLeft: 36,
   },
   metaLeft: {
     flexDirection: 'row',
@@ -265,50 +347,57 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
+    paddingVertical: 3,
+    borderRadius: 9,
     borderWidth: 1,
   },
   badgeText: {
     fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.3,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   dateBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.cardDarkElevated,
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 10,
+    paddingVertical: 3,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(255, 255, 255, 0.10)',
   },
   dateBadgeText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.textSubtitle,
+    fontWeight: '600',
+    color: '#C6CBDA',
   },
   statusPill: {
-    paddingHorizontal: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
     paddingVertical: 3,
-    borderRadius: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  statusDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    marginRight: 5,
   },
   statusPillTodo: {
-    backgroundColor: '#19263D',
+    backgroundColor: 'rgba(255, 255, 255, 0.06)',
   },
   statusPillDone: {
-    backgroundColor: '#0E3B27',
+    backgroundColor: 'rgba(14, 59, 39, 0.55)',
+    borderColor: 'rgba(105, 226, 168, 0.40)',
   },
   statusPillText: {
     fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-  },
-  statusTextTodo: {
-    color: COLORS.primary,
+    fontWeight: '700',
+    textTransform: 'lowercase',
   },
   statusTextDone: {
-    color: COLORS.success,
+    color: '#B3F7D2',
   },
 });
