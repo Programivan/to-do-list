@@ -69,6 +69,7 @@ export const TodoListScreen: React.FC<TodoListScreenProps> = ({ filter }) => {
   const {
     currentTheme,
     todos,
+    isStorageHydrated,
     loading,
     refreshing,
     searchQuery,
@@ -435,7 +436,8 @@ export const TodoListScreen: React.FC<TodoListScreenProps> = ({ filter }) => {
                 />
               }
               ListEmptyComponent={
-                <View style={styles.emptyContainer}>
+                isStorageHydrated ? (
+                  <View style={styles.emptyContainer}>
                   <View style={styles.emptyGlassCard}>
                     <BlurView
                       intensity={55}
@@ -528,6 +530,7 @@ export const TodoListScreen: React.FC<TodoListScreenProps> = ({ filter }) => {
                     </View>
                   </View>
                 </View>
+                ) : undefined
               }
             />
           )}

@@ -243,7 +243,7 @@ export default function ProfileTab() {
               style={{ marginRight: 10 }}
             />
             <Text style={styles.infoText}>
-              Синхронізація завдань із DummyJSON REST API
+              Автозбереження в AsyncStorage та синхронізація з DummyJSON
             </Text>
           </View>
 

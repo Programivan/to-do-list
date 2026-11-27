@@ -2,7 +2,9 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { Alert } from 'react-native';
@@ -20,6 +22,14 @@ import {
   fetchTodos,
   toggleTodoApi,
 } from '@/services/todoApi';
+import {
+  loadThemeFromStorage,
+  loadTodosFromStorage,
+  loadUseTodayDateFromStorage,
+  saveThemeToStorage,
+  saveTodosToStorage,
+  saveUseTodayDateToStorage,
+} from '@/services/todoStorage';
 import { AddTodoModal } from '@/components/AddTodoModal';
 import { ThemeSelectorModal } from '@/components/ThemeSelectorModal';
 import { triggerHaptic, triggerNotificationHaptic } from '@/utils/haptics';
@@ -29,6 +39,7 @@ interface TodoContextValue {
   setActivePaletteId: (id: MaterialYouPaletteId) => void;
   currentTheme: MaterialYouPalette;
   todos: Todo[];
+  isStorageHydrated: boolean;
   loading: boolean;
   refreshing: boolean;
   searchQuery: string;
@@ -97,6 +108,8 @@ export function TodoProvider({ children }: { children: React.ReactNode }) {
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
 
   const [todos, setTodos] = useState<Todo[]>([]);
+  const [isStorageHydrated, setIsStorageHydrated] = useState(false);
+  const hasMutatedTodosRef = useRef(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -106,6 +119,58 @@ export function TodoProvider({ children }: { children: React.ReactNode }) {
 
   const [useTodayDate, setUseTodayDate] = useState(false);
   const currentDateText = useTodayDate ? getFormattedDate() : '4th March 2018';
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function hydrateFromStorage() {
+      try {
+        const [storedTodos, storedPalette, storedUseTodayDate] =
+          await Promise.all([
+            loadTodosFromStorage(),
+            loadThemeFromStorage(),
+            loadUseTodayDateFromStorage(),
+          ]);
+
+        if (!isMounted) return;
+
+        if (storedTodos !== null && !hasMutatedTodosRef.current) {
+          setTodos(storedTodos);
+        }
+        if (storedPalette !== null) {
+          setActivePaletteId(storedPalette);
+        }
+        if (storedUseTodayDate !== null) {
+          setUseTodayDate(storedUseTodayDate);
+        }
+      } finally {
+        if (isMounted) {
+          setIsStorageHydrated(true);
+        }
+      }
+    }
+
+    hydrateFromStorage();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isStorageHydrated) return;
+    void saveTodosToStorage(todos);
+  }, [todos, isStorageHydrated]);
+
+  useEffect(() => {
+    if (!isStorageHydrated) return;
+    void saveThemeToStorage(activePaletteId);
+  }, [activePaletteId, isStorageHydrated]);
+
+  useEffect(() => {
+    if (!isStorageHydrated) return;
+    void saveUseTodayDateToStorage(useTodayDate);
+  }, [useTodayDate, isStorageHydrated]);
 
   const totalCount = todos.length;
   const completedCount = useMemo(
@@ -124,6 +189,7 @@ export function TodoProvider({ children }: { children: React.ReactNode }) {
         setLoading(true);
       }
       const data = await fetchTodos(30, 0);
+      hasMutatedTodosRef.current = true;
       setTodos(data.todos);
       triggerNotificationHaptic(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
@@ -145,6 +211,7 @@ export function TodoProvider({ children }: { children: React.ReactNode }) {
         style: 'destructive',
         onPress: () => {
           triggerNotificationHaptic(Haptics.NotificationFeedbackType.Warning);
+          hasMutatedTodosRef.current = true;
           setTodos([]);
         },
       },
@@ -156,6 +223,7 @@ export function TodoProvider({ children }: { children: React.ReactNode }) {
       const target = todos.find((t) => t.id === id);
       const nextCompleted = target ? !target.completed : true;
 
+      hasMutatedTodosRef.current = true;
       setTodos((prev) =>
         prev.map((item) =>
           item.id === id
@@ -176,6 +244,7 @@ export function TodoProvider({ children }: { children: React.ReactNode }) {
   );
 
   const handleDelete = useCallback(async (id: number) => {
+    hasMutatedTodosRef.current = true;
     setTodos((prev) => prev.filter((item) => item.id !== id));
     await deleteTodoApi(id);
   }, []);
@@ -194,13 +263,20 @@ export function TodoProvider({ children }: { children: React.ReactNode }) {
       userId: 1,
       time: '12 pm',
     };
+    hasMutatedTodosRef.current = true;
     setTodos((prev) => [newTodo, ...prev]);
 
     try {
       const serverTodo = await addTodoApi(formData);
-      setTodos((prev) =>
-        prev.map((t) => (t.id === tempId ? { ...t, id: serverTodo.id } : t))
-      );
+      setTodos((prev) => {
+        const idAlreadyExists = prev.some(
+          (t) => t.id === serverTodo.id && t.id !== tempId
+        );
+        if (idAlreadyExists) return prev;
+        return prev.map((t) =>
+          t.id === tempId ? { ...t, id: serverTodo.id } : t
+        );
+      });
     } catch (e) {
       console.warn('Local fallback used for added todo:', e);
     }
@@ -220,6 +296,7 @@ export function TodoProvider({ children }: { children: React.ReactNode }) {
       setActivePaletteId,
       currentTheme,
       todos,
+      isStorageHydrated,
       loading,
       refreshing,
       searchQuery,
@@ -245,6 +322,7 @@ export function TodoProvider({ children }: { children: React.ReactNode }) {
       activePaletteId,
       currentTheme,
       todos,
+      isStorageHydrated,
       loading,
       refreshing,
       searchQuery,
