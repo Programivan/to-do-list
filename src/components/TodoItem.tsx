@@ -238,7 +238,7 @@ export const TodoItem: React.FC<TodoItemProps> = React.memo(({ todo, onToggle, o
                   : { color: theme.onPrimaryContainer },
               ]}
             >
-              {todo.status || (todo.completed ? 'done' : 'to-do')}
+              {todo.completed ? 'Виконано' : 'В процесі'}
             </Text>
           </View>
         </View>
@@ -395,7 +395,6 @@ const styles = StyleSheet.create({
   statusPillText: {
     fontSize: 11,
     fontWeight: '700',
-    textTransform: 'lowercase',
   },
   statusTextDone: {
     color: '#B3F7D2',

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Animated,
   FlatList,
@@ -17,10 +17,33 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 
 import { COLORS, GLASS_TOKENS } from '@/constants/theme';
-import { useTodoContext } from '@/context/TodoContext';
 import { LiquidBackground } from '@/components/LiquidBackground';
 import { TodoItem } from '@/components/TodoItem';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import {
+  deleteTodoAsync,
+  loadTodosFromApi,
+  selectCompletedCount,
+  selectCurrentTheme,
+  selectIsSearchVisible,
+  selectIsStorageHydrated,
+  selectLoading,
+  selectProgressPercent,
+  selectRefreshing,
+  selectSearchQuery,
+  selectTodos,
+  selectTotalCount,
+  selectUseTodayDate,
+  setIsAddModalOpen,
+  setIsThemeModalOpen,
+  setSearchQuery,
+  toggleSearchVisible,
+  toggleTodoAsync,
+  toggleUseTodayDate,
+} from '@/store/todoSlice';
+import { getFormattedDate } from '@/utils/date';
 import { triggerHaptic } from '@/utils/haptics';
+import { confirmClearAllTodos } from '@/utils/todoAlerts';
 
 export type TodoListFilter = 'all' | 'pending' | 'completed';
 
@@ -66,28 +89,54 @@ const FILTER_META: Record<
 export const TodoListScreen: React.FC<TodoListScreenProps> = ({ filter }) => {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
-  const {
-    currentTheme,
-    todos,
-    isStorageHydrated,
-    loading,
-    refreshing,
-    searchQuery,
-    setSearchQuery,
-    isSearchVisible,
-    setIsSearchVisible,
-    setUseTodayDate,
-    currentDateText,
-    totalCount,
-    completedCount,
-    progressPercent,
-    openAddModal,
-    openThemeModal,
-    handleLoadFromApi,
-    handleClearAll,
-    handleToggle,
-    handleDelete,
-  } = useTodoContext();
+  const dispatch = useAppDispatch();
+
+  const currentTheme = useAppSelector(selectCurrentTheme);
+  const todos = useAppSelector(selectTodos);
+  const isStorageHydrated = useAppSelector(selectIsStorageHydrated);
+  const loading = useAppSelector(selectLoading);
+  const refreshing = useAppSelector(selectRefreshing);
+  const searchQuery = useAppSelector(selectSearchQuery);
+  const isSearchVisible = useAppSelector(selectIsSearchVisible);
+  const useTodayDate = useAppSelector(selectUseTodayDate);
+  const totalCount = useAppSelector(selectTotalCount);
+  const completedCount = useAppSelector(selectCompletedCount);
+  const progressPercent = useAppSelector(selectProgressPercent);
+
+  const currentDateText = useTodayDate ? getFormattedDate() : '4th March 2018';
+
+  const handleToggle = useCallback(
+    (id: number) => {
+      void dispatch(toggleTodoAsync(id));
+    },
+    [dispatch]
+  );
+
+  const handleDelete = useCallback(
+    (id: number) => {
+      void dispatch(deleteTodoAsync(id));
+    },
+    [dispatch]
+  );
+
+  const handleLoadFromApi = useCallback(
+    (isRefresh = false) => {
+      void dispatch(loadTodosFromApi(isRefresh));
+    },
+    [dispatch]
+  );
+
+  const handleClearAll = useCallback(() => {
+    confirmClearAllTodos(dispatch, totalCount);
+  }, [dispatch, totalCount]);
+
+  const openAddModal = useCallback(() => {
+    dispatch(setIsAddModalOpen(true));
+  }, [dispatch]);
+
+  const openThemeModal = useCallback(() => {
+    dispatch(setIsThemeModalOpen(true));
+  }, [dispatch]);
 
   const meta = FILTER_META[filter];
 
@@ -207,7 +256,7 @@ export const TodoListScreen: React.FC<TodoListScreenProps> = ({ filter }) => {
                 style={styles.dateBadge}
                 onPress={() => {
                   triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-                  setUseTodayDate((prev) => !prev);
+                  dispatch(toggleUseTodayDate());
                 }}
                 activeOpacity={0.7}
               >
@@ -262,8 +311,7 @@ export const TodoListScreen: React.FC<TodoListScreenProps> = ({ filter }) => {
                 ]}
                 onPress={() => {
                   triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-                  setIsSearchVisible((v) => !v);
-                  if (isSearchVisible) setSearchQuery('');
+                  dispatch(toggleSearchVisible());
                 }}
                 activeOpacity={0.7}
               >
@@ -367,14 +415,14 @@ export const TodoListScreen: React.FC<TodoListScreenProps> = ({ filter }) => {
                 placeholder="Швидкий пошук завдань..."
                 placeholderTextColor="#7E8497"
                 value={searchQuery}
-                onChangeText={setSearchQuery}
+                onChangeText={(q) => dispatch(setSearchQuery(q))}
                 autoFocus
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity
                   onPress={() => {
                     triggerHaptic(Haptics.ImpactFeedbackStyle.Light);
-                    setSearchQuery('');
+                    dispatch(setSearchQuery(''));
                   }}
                   style={styles.clearBtn}
                 >

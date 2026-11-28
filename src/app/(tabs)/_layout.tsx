@@ -6,7 +6,13 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GLASS_TOKENS } from '@/constants/theme';
-import { useTodoContext } from '@/context/TodoContext';
+import { useAppSelector } from '@/store/hooks';
+import {
+  selectCompletedCount,
+  selectCurrentTheme,
+  selectTotalCount,
+  selectUncompletedCount,
+} from '@/store/todoSlice';
 import { triggerSelectionHaptic } from '@/utils/haptics';
 
 type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
@@ -24,13 +30,20 @@ function renderTabIcon(name: FeatherIconName) {
   return TabBarIcon;
 }
 
+function formatBadgeCount(count: number): string | number | undefined {
+  if (count <= 0) return undefined;
+  return count > 99 ? '99+' : count;
+}
+
 /**
- * Bottom Tab Navigation layout using Expo Router JavaScript Tabs.
+ * Bottom Tab Navigation layout using Expo Router JavaScript Tabs and Redux state.
  */
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-  const { currentTheme, totalCount, pendingCount, completedCount } =
-    useTodoContext();
+  const currentTheme = useAppSelector(selectCurrentTheme);
+  const totalCount = useAppSelector(selectTotalCount);
+  const pendingCount = useAppSelector(selectUncompletedCount);
+  const completedCount = useAppSelector(selectCompletedCount);
 
   const bottomPadding = Math.max(insets.bottom, 10);
 
@@ -84,7 +97,7 @@ export default function TabLayout() {
         options={{
           title: 'Всі',
           tabBarIcon: renderTabIcon('list'),
-          tabBarBadge: totalCount > 0 ? totalCount : undefined,
+          tabBarBadge: formatBadgeCount(totalCount),
         }}
       />
       <Tabs.Screen
@@ -92,7 +105,13 @@ export default function TabLayout() {
         options={{
           title: 'В роботі',
           tabBarIcon: renderTabIcon('clock'),
-          tabBarBadge: pendingCount > 0 ? pendingCount : undefined,
+          tabBarBadge: formatBadgeCount(pendingCount),
+          tabBarBadgeStyle: {
+            backgroundColor: '#FF3B30',
+            color: '#FFFFFF',
+            fontSize: 10,
+            fontWeight: '800',
+          },
         }}
       />
       <Tabs.Screen
@@ -100,7 +119,7 @@ export default function TabLayout() {
         options={{
           title: 'Виконані',
           tabBarIcon: renderTabIcon('check-circle'),
-          tabBarBadge: completedCount > 0 ? completedCount : undefined,
+          tabBarBadge: formatBadgeCount(completedCount),
         }}
       />
       <Tabs.Screen

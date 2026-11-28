@@ -19,9 +19,22 @@ import {
   MATERIAL_YOU_PALETTES,
   MaterialYouPaletteId,
 } from '@/constants/theme';
-import { useTodoContext } from '@/context/TodoContext';
 import { LiquidBackground } from '@/components/LiquidBackground';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import {
+  loadTodosFromApi,
+  selectActivePaletteId,
+  selectCompletedCount,
+  selectCurrentTheme,
+  selectLoading,
+  selectProgressPercent,
+  selectTotalCount,
+  selectUncompletedCount,
+  setActivePaletteId,
+  setIsThemeModalOpen,
+} from '@/store/todoSlice';
 import { triggerHaptic, triggerSelectionHaptic } from '@/utils/haptics';
+import { confirmClearAllTodos } from '@/utils/todoAlerts';
 
 /**
  * Profile, task statistics, and Material You theme settings tab.
@@ -29,19 +42,21 @@ import { triggerHaptic, triggerSelectionHaptic } from '@/utils/haptics';
 export default function ProfileTab() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useBottomTabBarHeight();
-  const {
-    activePaletteId,
-    setActivePaletteId,
-    currentTheme,
-    totalCount,
-    completedCount,
-    pendingCount,
-    progressPercent,
-    loading,
-    openThemeModal,
-    handleLoadFromApi,
-    handleClearAll,
-  } = useTodoContext();
+  const dispatch = useAppDispatch();
+
+  const activePaletteId = useAppSelector(selectActivePaletteId);
+  const currentTheme = useAppSelector(selectCurrentTheme);
+  const totalCount = useAppSelector(selectTotalCount);
+  const completedCount = useAppSelector(selectCompletedCount);
+  const pendingCount = useAppSelector(selectUncompletedCount);
+  const progressPercent = useAppSelector(selectProgressPercent);
+  const loading = useAppSelector(selectLoading);
+
+  const openThemeModal = () => dispatch(setIsThemeModalOpen(true));
+  const handleLoadFromApi = (isRefresh = false) => {
+    void dispatch(loadTodosFromApi(isRefresh));
+  };
+  const handleClearAll = () => confirmClearAllTodos(dispatch, totalCount);
 
   const percent = Math.round(progressPercent * 100);
 
@@ -180,7 +195,7 @@ export default function ProfileTab() {
                     key={id}
                     onPress={() => {
                       triggerSelectionHaptic();
-                      setActivePaletteId(id);
+                      dispatch(setActivePaletteId(id));
                     }}
                     activeOpacity={0.8}
                     style={[
